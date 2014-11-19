@@ -1,0 +1,114 @@
+/* Default CSS */
+
+body { 
+	font-family: 'Droid Sans', sans-serif;
+	background-color:#333333;
+}
+
+div {}
+
+ /**********HEADER**********/
+   
+#Header {
+	max-width: 100%;
+	padding:0;
+	margin:0;
+	font-family: 'Dosis', sans-serif;
+}
+
+/*setting widths of header blocks*/
+#logo{
+	width:20%;
+}
+
+#searchbar{
+	width:75%;	
+}
+
+#searchbar #search {
+	width:200px;
+}
+
+.NavBarItem {
+	width: 31.5%;
+}
+
+/*setting style of header blocks*/
+#Header div{
+    display:inline-block;
+    padding:0;
+	margin:0;
+	height:40px;
+	font-size:1.5em;
+
+	color:#000000;
+	background-color:#bdbbbd;
+	-moz-box-shadow:inset -4px -4px 0px 0px #a35b02;
+	-webkit-box-shadow:inset -4px -4px 0px 0px #a35b02;
+	box-shadow:inset -4px -4px 0px 0px #a35b02;
+	border-radius:7px;
+
+	margin-top:4px;
+} 
+
+#Header a div:hover {
+	color:#a35b02;
+}
+  
+
+#Header a div:active {
+	text-decoration: underline;
+}
+
+
+/**********Body**********/
+
+#newsbody, #itemsbody, #championsbody {
+	margin-left:auto;
+	margin-right:auto;
+	margin-top:10px;
+	padding:1px 15px;
+	max-width:700px;
+	font-size:1.25em;
+
+	background-color:#bdbbbd;
+	-moz-box-shadow:inset -4px -4px 0px 0px #a35b02;
+	-webkit-box-shadow:inset -4px -4px 0px 0px #a35b02;
+	box-shadow:inset -4px -4px 0px 0px #a35b02;
+	border-radius:7px;
+}
+
+/**********Footer**********/
+
+#Footer {
+	position:absolute;
+	bottom:0;
+	font-size:0.75em;
+}
+
+#Footer div {
+	display:inline-block;
+}
+
+#contact {
+	max-width:50%;
+	float:left;
+	margin-right:20px;
+}
+
+#contact a:active, a:visited, a:link {
+	text-decoration:none;
+	color:#bdbbbd;
+}
+
+#contact a:hover {	
+	text-decoration:underline;
+	color:#bdbbbd;
+}
+
+
+#copyright {	
+	color:#bdbbbd;
+	float:right;
+	width:300px;
+}

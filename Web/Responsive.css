@@ -1,0 +1,23 @@
+@media screen and (min-width: 1200px) {
+	#logo{
+		width:10%;
+	}
+
+	#searchbar{
+		width:35%;
+		max-width:100%;
+	}
+
+	#searchbar #search{
+		width:300px;
+	}
+
+	.NavBarItem {
+		width: 17%;
+	}
+
+	#newsbody {
+		max-width:60%;
+
+	}
+}
