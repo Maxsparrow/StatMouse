@@ -1,4 +1,4 @@
-getgames<-function(summonerids=NA,limit=50000) {
+getgames<-function(summonerids=NA,limit=50000,numdays=7) {
     ##Takes summonerids as a vector, if you pass it nothing it will use 'summonerids 1.csv' 
     ##from the working directory to create the summonerids vector
     ##Current runtimes:
@@ -8,23 +8,24 @@ getgames<-function(summonerids=NA,limit=50000) {
     ##Avg time per game (10 rows) 11/13: 2.77 seconds
     
     ##Load needed functions from other file
-    source('D:/The Internet/My Documents/Dropbox/My Documents/Riot API/SharedAssets.R')
+    source('./StatMouse/R/SharedAssets.R')
     
     ##Connect to database
     con<-reconnectdb("statmous_gamedata")    
     
-    ##Read in cached summonerIds file and skip the first row which is just a blank column header
+    ##Read in cached summonerIds from database as a vector
     summonerids<-dbGetQuery(con,'SELECT summonerId FROM statmous_gamedata.summoners;')[,1]
     
-    ##Find any previous matches within the past week, so when we pull new matches from the past week, we check that they aren't duplicates
-    datelimit<-format(Sys.time()-60*60*24*7,"%Y-%m-%d")
+    ##Find any previous matches within the day limit, so when we get new matches, we can check for duplicate matchIds
+    datelimit<-format(Sys.time()-60*60*24*numdays,"%Y-%m-%d")
     previousmatches<-dbGetQuery(con,paste0("SELECT matchId FROM statmous_gamedata.games WHERE createDate >= '",datelimit,"';"))
-    previousmatches<-as.numeric(previousmatches[,1])
+    if(length(previousmatches)!=0) {previousmatches<-as.numeric(previousmatches[,1])}
     dbDisconnect(con)
         
     ##Rearrange summonerids so we pull them in random order
     ##And remove extra summonerids since we don't need to use quite so many
-    summonerids<-sample(summonerids,limit)
+    ##The limit must be greater if we have a low number of days we are pulling in, since there are fewer matches for each summoner
+    summonerids<-sample(summonerids,limit*7/numdays)
     
     ##Create data frame for later if it doesn't exist already
     if(!exists("games")) {games<-data.frame()}
@@ -37,6 +38,12 @@ getgames<-function(summonerids=NA,limit=50000) {
         c<-c+1
               
         currentsummoner<-summonerids[c]
+                
+        ##Check if we ran out of summonerids due to not pulling enough in, if so end execution
+        if(c>length(summonerids)) {
+            print("Ending execution, ran out of summonerids")
+            stop(endfunction("games",games))
+        }
         
         ##Use summonerId to pull past 10 games (max currently available)
         request <- paste("/api/lol/na/v2.2/matchhistory/",currentsummoner,sep="")
@@ -54,8 +61,8 @@ getgames<-function(summonerids=NA,limit=50000) {
         matches$matchCreation<-sapply(matches$matchCreation,fun)
         class(matches$matchCreation)<-"Date"
         
-        ##Filter for only games within the past 7 days
-        datelimit<-as.Date(Sys.time()-60*60*24*7,origin="1970-01-01")
+        ##Filter for only games within the daylimit (default is past 7 days)
+        datelimit<-as.Date(Sys.time()-60*60*24*numdays,origin="1970-01-01")
         matches<-matches[matches$matchCreation>=datelimit,]
         
         ##Find list of matchIds
@@ -78,7 +85,7 @@ getgames<-function(summonerids=NA,limit=50000) {
         }
     }
     
-    endfunction("games",games) 
+    return(endfunction("games",games))
 }
 
 creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
@@ -196,7 +203,7 @@ tryget<-function(apiurl,requesttype,requestitem) {
         ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
         if(attemptcount==5 & class(data)=="try-error") {
             print("After retrying for 30 minutes, could not connect to server, ending execution")
-            endfunction(games,requesttype,requestitem)
+            stop(endfunction(requesttype,games))
         }
         
         attemptcount<-attemptcount+1
@@ -217,11 +224,11 @@ pauseforratelimit<-function(timelimit,requesttypecount,requesttype) {
 
 addtodb <- function(gamedata) {
     ##Adds the current gamedata to the MySQL database
-    con<-reconnectdb("statmous_gamedata")
     
     result<-FALSE
     trycount<-0
-    while(result!=TRUE) {        
+    while(result!=TRUE) { 
+        con<-reconnectdb("statmous_gamedata")
         result<-try(dbWriteTable(con,'games',gamedata,append=TRUE,row.names=FALSE))
         
         trycount<-trycount+1
@@ -249,8 +256,8 @@ endfunction <- function(requesttype="NA",games) {
         write.csv(games,paste0("finalgames ",todaydt,".csv"),row.names=FALSE)  
                 
         ##Output the number of games we saved and the final count on MasterFinalGames
-        gamesrows<-nrow(games)
-        outputmessage<-paste(gamesrows,"games added to MySQL database")
+        numgames<-nrow(games)/10
+        outputmessage<-paste(numgames,"games added to MySQL database")
         return(outputmessage)
     } else {
         stop("Error: Endtype is not games")

@@ -51,7 +51,7 @@ createmodel <- function(champlist="ALL") {
 
 makewidedata<-function(champion) {  
     ##Load needed functions from other file and needed libraries
-    source('D:/The Internet/My Documents/Dropbox/My Documents/Riot API/SharedAssets.R')    
+    source('./StatMouse/R/SharedAssets.R')   
     library(reshape2)
     
     con<-reconnectdb("statmous_gamedata")
@@ -91,11 +91,11 @@ makewidedata<-function(champion) {
     widedata<-widedata[,-zerocol]
     
     ##Remove matchId,teamPercGold, and playerPercGold because we won't need them anymore
-#     unneededcols<-c("matchId","teamPercGold","playerPercGold")
-#     for(colname in unneededcols) {
-#         colnum<-grep(colname,colnames(widedata))
-#         widedata<-widedata[,-colnum]
-#     }
+    unneededcols<-c("matchId","teamPercGold","playerPercGold")
+    for(colname in unneededcols) {
+        colnum<-grep(colname,colnames(widedata))
+        widedata<-widedata[,-colnum]
+    }
     
     ##add 'item' before each item column
     itemcolstart<-grep("1",colnames(widedata))[1]
@@ -143,7 +143,7 @@ summarizemodel<-function(model,trainset) {
     
     ##Calls the static item data call to get the names and other info for items
     if(!exists("itemtable")) {
-        source('D:/The Internet/My Documents/Dropbox/My Documents/Riot API/GetGames.R')
+        source('./StatMouse/R/GetGames.R')
         itemtable<-itemtablecreate()
         itemtable<<-itemtable
     }
@@ -185,7 +185,7 @@ summarizemodel<-function(model,trainset) {
     ##Create itempower, normalized with mean 5 and standard deviation 2, set max as 10 and min as 0
     ##First remove the rows for teamahead and fed player
     removerows<-c("teamahead","fedplayer")
-    removerowsnum<-unlist(sapply(removecols,function(x) grep(x,as.character(modelsummary$itemId))))
+    removerowsnum<-unlist(sapply(removerows,function(x) grep(x,as.character(modelsummary$itemId))))
     itempower<-modelsummary[-removerowsnum,"lowerbound"]
     itempowerId<-modelsummary[-removerowsnum,"itemId"]
     ipmean<-mean(itempower)
@@ -224,7 +224,7 @@ analysis1<-function(modeldata) {
     
     ##Calls the static item data call to get the names and other info for items
     if(!exists("itemtable")) {
-        source('D:/The Internet/My Documents/Dropbox/My Documents/Riot API/GetGames.R')
+        source('./StatMouse/R/GetGames.R')
         itemtable<-itemtablecreate()
         itemtable<<-itemtable
     }

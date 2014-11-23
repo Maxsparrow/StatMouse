@@ -7,7 +7,23 @@ reconnectdb <- function(database) {
     for(i in list) {dbDisconnect(i)}
     
     ##Reconnects to the games database using username and password
-    con<-dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password="ML4life",dbname=database)
+    con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password="ML4life",dbname=database))
+    
+    attemptcount<-0
+    while(class(con)=="try-error") {
+        print(paste("Could not connect to MySQL Server. It has been",(attemptcount*5),"minutes without connection. Waiting 5 minutes then trying again."))
+        Sys.sleep(300)
+        
+        ##Try pulling again
+        con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password="ML4life",dbname=database))
+        
+        ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
+        if(attemptcount==5 & class(con)=="try-error") {
+            stop("After retrying for 30 minutes, could not connect to server, ending execution")
+        }
+        
+        attemptcount<-attemptcount+1
+    }
     
     return(con)
 }
@@ -110,10 +126,10 @@ apiquery <- function(request,requesttype = NA,requestitem = 0) {
         ##Try pulling data again
         data<-tryget(apiurl,requesttype,requestitem)
         
-        ##If we get an error 5 times, give up
+        ##If we get an error 2 times, give up
         k=k+1
-        if(k==5) {
-            print("After 5 attempts to retry api pull, skipping this entry")
+        if(k==2) {
+            print(paste("After",k,"attempts to retry api pull, skipping this entry"))
             break
         }        
     }
