@@ -56,9 +56,12 @@ makewidedata<-function(champion) {
     
     con<-reconnectdb("statmous_gamedata")
     
+    ##Set date to pull games only within the past week
+    datelimit<-as.Date(Sys.time()-60*60*24*7,origin="1970-01-01")
+    
     ##Keep matchId so we get a unique identifier
     champgames<-dbGetQuery(con,paste0("SELECT matchId,winner,teamPercGold,playerPercGold,item0,item1,item2,item3,item4,item5,item6
-                                      FROM statmous_gamedata.games WHERE championName='",champion,"';"))
+                                      FROM statmous_gamedata.games WHERE championName='",champion,"' AND createDate>='",datelimit,"';"))
     champgames<-unique(champgames)
         
     ##Set item variables as character class
@@ -136,6 +139,8 @@ measuremodel<-function(model,testset) {
 }
 
 summarizemodel<-function(model,trainset) {
+    pcol<-"Pr(>|t|)"    
+    
     modelsummary<-as.data.frame(summary(model)$coefficients)
     
     ##Add column for itemIds without the 'item' word
@@ -171,7 +176,7 @@ summarizemodel<-function(model,trainset) {
     ##the enchantments are and different bonetooth necklaces. But I think trinkets in particular need to be rated differently, and possibly
     ##regressed separately.
     modelsummary<-modelsummary[!grepl("Trinket",modelsummary$itemName),]
-    modelsummary<-modelsummary[!grepl("Enchantment",modelsummary$itemName),]
+    #modelsummary<-modelsummary[!grepl("Enchantment",modelsummary$itemName),]
     modelsummary<-modelsummary[!grepl("Bonetooth Necklace",modelsummary$itemName),]
         
     ##Keep only items that are in more than 1% of games (2% of training set), consider tinkering with this as we get bigger data
@@ -179,8 +184,8 @@ summarizemodel<-function(model,trainset) {
     
     ##Takes lowest 20 p-values, so that we get the same number of items at the end, but now this doesn't limit significance in a meaningful way
     ##Consider removing it when we have bigger data
-    modelsummary<-head(modelsummary[order(modelsummary[,"Pr(>|t|)"]),],20)
-    modelsummary[,"Pr(>|t|)"]<-round(modelsummary[,"Pr(>|t|)"],9)
+    modelsummary<-head(modelsummary[order(modelsummary[,pcol]),],20)
+    modelsummary[,pcol]<-round(modelsummary[,pcol],9)
     
     ##Create itempower, normalized with mean 5 and standard deviation 2, set max as 10 and min as 0
     ##First remove the rows for teamahead and fed player
