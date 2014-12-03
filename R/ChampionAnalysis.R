@@ -49,19 +49,26 @@ createmodel <- function(champlist="ALL") {
     return(allchamps)
 }
 
-makewidedata<-function(champion) {  
+makewidedata<-function(champion="ALL") {  
     ##Load needed functions from other file and needed libraries
     source('./StatMouse/R/SharedAssets.R')   
     library(reshape2)
     
+    ##Connect to database
     con<-reconnectdb("statmous_gamedata")
     
-    ##Set date to pull games only within the past week
-    datelimit<-as.Date(Sys.time()-60*60*24*7,origin="1970-01-01")
+    ##Set date to pull games only within the past week, should set this as a patch date. Need like a universal patch date somewhere in shared assets
+    #datelimit<-as.Date(Sys.time()-60*60*24*7,origin="1970-01-01")
     
-    ##Keep matchId so we get a unique identifier
+    ##Set the string to use in our search. If all champions are pulled use a blank string
+    if(championName=="ALL") {
+        champstring<-""
+    } else {
+        champstring<-paste0("WHERE championName='",champion,"'")
+    }
+    ##Get gamedata, keep matchId so we get a unique identifier for transformations
     champgames<-dbGetQuery(con,paste0("SELECT matchId,winner,teamPercGold,playerPercGold,item0,item1,item2,item3,item4,item5,item6
-                                      FROM statmous_gamedata.games WHERE championName='",champion,"' AND createDate>='",datelimit,"';"))
+                                      FROM statmous_gamedata.games ",champstring," AND createDate>='",datelimit,"';"))
     champgames<-unique(champgames)
         
     ##Set item variables as character class
@@ -69,6 +76,9 @@ makewidedata<-function(champion) {
     for (i in itemcols) {
         champgames[,i]<-as.character(champgames[,i])
     }    
+    
+    ##Remove item6 column for trinkets for the time being, they should be analyzed separately
+    champgames<-champgames[,-grep("item6",colnames(champgames))]
     
     ##Experiment with these two variables and see if they give better linear regression results - i like these so far
     champgames$teamahead<-0
@@ -109,38 +119,115 @@ makewidedata<-function(champion) {
     return(widedata)
 }
 
+basicstatistics <- function() {
+    ##Finds basic info about all champions such as win rate, popularity, and role
+    widedata<-makewidedata("ALL")
+    
+    cwinrate<-aggregate(winner~championName,data=widedata,mean)
+    counts<-aggregate(matchId~championName,data=widedata,length)
+    
+    cwinrate<-merge(cwinrate,counts,by="championName")
+    
+    ##Need to find where the roles are in my desktop
+    ##roles<-read.csv("Champion Roles 
+    
+    cwinrate<-merge(cwinrate,roles,by="championName")
+    
+    cwinrate<-cwinrate[order(cwinrate$role,-cwinrate$winner),]
+}
+
 splitdf <- function(dataframe, seed=NULL) {
+    ##Splits data set into 60% training set and 40% test set. Suggested by Jeff Leek for mid range sample size
     if (!is.null(seed)) set.seed(seed)
     index <- 1:nrow(dataframe)
-    trainindex <- sample(index, trunc(length(index)/2))
+    trainindex <- sample(index, trunc(length(index)*.6))
     trainset <- dataframe[trainindex, ]
     testset <- dataframe[-trainindex, ]
     list(trainset=trainset,testset=testset)
 }
 
 measuremodel<-function(model,testset) {
-    ##Input a fit or model from glm and a testset
+    ##Input a fit or model from glm and a testset - use trainset while fine tuning the model, testset only for a final run
     n<-nrow(testset)
     
-    pred<-predict(model,testset[,-1],type="response")
+    ##Since winner is a factor now, change it to numeric
+    testset[,1]<-as.numeric(testset[,1])
     
+    ##Find predictions as binary values
+    pred<-predict(model,testset[,-1],type="response")
     predbin<-pred
     predbin[predbin<0.5]<-0
     predbin[predbin>=0.5]<-1
     
+    ##Find percent correct out of all observations
     predtable<-table(predbin,testset[,1])
     print(predtable)
     perccorrect<-(predtable[1,1]+predtable[2,2])/nrow(testset)
     print(paste("Percent correct as binary:",perccorrect))
     
+    ##Find mean squared error, change this to a better evaluator for classification like ROC, deviance
     print(paste("MSE (binary):",(1/n*sum((predbin-testset[,1])^2))))
-    
     print(paste("MSE (raw):",(1/n*sum((pred-testset[,1])^2))))    
 }
 
-summarizemodel<-function(model,trainset) {
+summarizerf<-function(model,trainset) {
+    ##Summarizes Random Forest models. Input a random forest fit and a training set and it will output itemPower table
+    modelsummary<-round(importance(model),6)
+    
+    ##Add column for itemIds without the 'item' word
+    modelsummary<-cbind("itemId"=gsub("item","",rownames(modelsummary)),modelsummary)
+    
+    ##Calls the static item data call to get the names and other info for items and merges it to our table
+    if(!exists("itemtable")) {
+        source('./StatMouse/R/SharedAssets.R')
+        itemtable<-itemtablecreate()
+        itemtable<<-itemtable
+    }
+    modelsummary<-merge(modelsummary,itemtable,by="itemId",all.x=TRUE)
+    
+    ##Find popularity (frequency) of each item to remove any below a certain threshold
+    ##Also including win percentage for testing and comparison purposes, but remove before sharing, it is misleading
+    itemcounts<-data.frame("itemId"=colnames(trainset),"popularityPerc"=0,"winPerc"=0)
+    #itemcounts$itemId<-as.character(itemcounts$itemId)     ##This seems unnecessary, REMOVE
+    for(i in 1:nrow(itemcounts)) {
+        itemcounts$popularityPerc[i]<-sum(trainset[,as.character(itemcounts$itemId[i])])/nrow(trainset)
+        itemcounts$winPerc[i]<-mean(trainset[as.character(itemcounts$itemId[i])>0,"winner"])
+    }
+    
+    ##Remove the item word so we can merge in to the modelsummary
+    itemcounts$itemId<-gsub("item","",itemcounts$itemId)
+    modelsummary<-merge(modelsummary,itemcounts,by="itemId",all.x=TRUE)
+    
+    ##Keep only items that are in more than 1% of games (2% of training set), consider tinkering with this as we get bigger data
+    modelsummary<-modelsummary[modelsummary$popularityPerc>0.02,] 
+    
+    ##Create itempower, normalized with mean 5 and standard deviation 2, set max as 10 and min as 0
+    ##First remove the rows for teamahead and fed player
+    removerows<-c("teamahead","fedplayer","teamPercGold","playerPercGold","Intercept")
+    removerowsnum<-unlist(sapply(removerows,function(x) grep(x,as.character(modelsummary$itemId))))
+    itempower<-modelsummary[-removerowsnum,"MeanDecreaseGini"]
+    itempowerId<-modelsummary[-removerowsnum,"itemId"]
+    ipmean<-mean(itempower)
+    ipsd<-sd(itempower)
+    itempower<-2*((itempower-ipmean)/ipsd+2.5)
+    itempower[itempower>10]<-10
+    itempower[itempower<0]<-0
+    
+    ##Add itempower to the modelsummary
+    itempower<-data.frame("itempower"=itempower,"itemId"=itempowerId)
+    modelsummary<-merge(modelsummary,itempower,by="itemId",all.x=TRUE)    
+    modelsummary<-modelsummary[order(-modelsummary$itempower),]
+    
+    return(modelsummary)
+}
+
+summarizereg<-function(model,trainset) {
+    ##Summarize regression models. Input a fit and a training set and it will output an itemPower table
+    
+    ##Set column to use for p-values, this is based on the type of function, whether it is binomial or not
     pcol<-"Pr(>|t|)"    
     
+    ##Create a data frame with the model coefficients and their p values
     modelsummary<-as.data.frame(summary(model)$coefficients)
     
     ##Add column for itemIds without the 'item' word
@@ -148,11 +235,10 @@ summarizemodel<-function(model,trainset) {
     
     ##Calls the static item data call to get the names and other info for items
     if(!exists("itemtable")) {
-        source('./StatMouse/R/GetGames.R')
+        source('./StatMouse/R/SharedAssets.R')
         itemtable<-itemtablecreate()
         itemtable<<-itemtable
     }
-    
     modelsummary<-merge(modelsummary,itemtable,by="itemId",all.x=TRUE)
     modelsummary<-modelsummary[colnames(modelsummary)[c(1,6,2:5)]]
     
@@ -172,12 +258,9 @@ summarizemodel<-function(model,trainset) {
     itemcounts$itemId<-gsub("item","",itemcounts$itemId)
     modelsummary<-merge(modelsummary,itemcounts,by="itemId",all.x=TRUE)
     
-    ##Temporarily removing these. We will want to include them later when we have bigger data, and more clear definitions of what
-    ##the enchantments are and different bonetooth necklaces. But I think trinkets in particular need to be rated differently, and possibly
-    ##regressed separately.
-    modelsummary<-modelsummary[!grepl("Trinket",modelsummary$itemName),]
+    ##Enchantments can be removed if they are confusing. Need to find a way to make it more clear what they belong to. 
+    ##Trinkets are now removed higher up in the makewidedata function
     #modelsummary<-modelsummary[!grepl("Enchantment",modelsummary$itemName),]
-    modelsummary<-modelsummary[!grepl("Bonetooth Necklace",modelsummary$itemName),]
         
     ##Keep only items that are in more than 1% of games (2% of training set), consider tinkering with this as we get bigger data
     modelsummary<-modelsummary[modelsummary$count>(n/50),] 
@@ -229,7 +312,7 @@ analysis1<-function(modeldata) {
     
     ##Calls the static item data call to get the names and other info for items
     if(!exists("itemtable")) {
-        source('./StatMouse/R/GetGames.R')
+        source('./StatMouse/R/SharedAssets.R')
         itemtable<-itemtablecreate()
         itemtable<<-itemtable
     }
