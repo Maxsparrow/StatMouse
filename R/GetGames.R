@@ -1,4 +1,4 @@
-getgames<-function(summonerids=NA,limit=50000,numdays=7) {
+getgames<-function(summonerids=NA,limit=50000) {
     ##Takes summonerids as a vector, if you pass it nothing it will use 'summonerids 1.csv' 
     ##from the working directory to create the summonerids vector
     ##Current runtimes:
@@ -16,9 +16,8 @@ getgames<-function(summonerids=NA,limit=50000,numdays=7) {
     ##Read in cached summonerIds from database as a vector
     summonerids<-dbGetQuery(con,'SELECT summonerId FROM statmous_gamedata.summoners;')[,1]
     
-    ##Find any previous matches within the day limit, so when we get new matches, we can check for duplicate matchIds
-    datelimit<-format(Sys.time()-60*60*24*numdays,"%Y-%m-%d")
-    previousmatches<-dbGetQuery(con,paste0("SELECT matchId FROM statmous_gamedata.games WHERE createDate >= '",datelimit,"';"))
+    ##Find any previous matches since the last patch, so when we get new matches, we can check for duplicate matchIds
+    previousmatches<-dbGetQuery(con,paste0("SELECT matchId FROM statmous_gamedata.games WHERE createDate >= '",patchdate,"';"))
     if(length(previousmatches)!=0) {previousmatches<-as.numeric(previousmatches[,1])}
     dbDisconnect(con)
         
@@ -61,9 +60,8 @@ getgames<-function(summonerids=NA,limit=50000,numdays=7) {
         matches$matchCreation<-sapply(matches$matchCreation,fun)
         class(matches$matchCreation)<-"Date"
         
-        ##Filter for only games within the daylimit (default is past 7 days)
-        datelimit<-as.Date(Sys.time()-60*60*24*numdays,origin="1970-01-01")
-        matches<-matches[matches$matchCreation>=datelimit,]
+        ##Filter for only games since the last patch
+        matches<-matches[matches$matchCreation>=patchdate,]
         
         ##Find list of matchIds
         matchIds<-unlist(matches$matchId)

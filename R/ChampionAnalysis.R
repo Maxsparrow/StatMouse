@@ -49,16 +49,15 @@ createmodel <- function(champlist="ALL") {
     return(allchamps)
 }
 
-makewidedata<-function(champion="ALL") {  
+makewidedata<-function(champion="ALL") {
+    ##Select a champion to get games data for or use ALL/default for all games
+    
     ##Load needed functions from other file and needed libraries
     source('./StatMouse/R/SharedAssets.R')   
     library(reshape2)
     
     ##Connect to database
     con<-reconnectdb("statmous_gamedata")
-    
-    ##Set date to pull games only within the past week, should set this as a patch date. Need like a universal patch date somewhere in shared assets
-    #datelimit<-as.Date(Sys.time()-60*60*24*7,origin="1970-01-01")
     
     ##Set the string to use in our search. If all champions are pulled use a blank string
     if(championName=="ALL") {
@@ -68,7 +67,7 @@ makewidedata<-function(champion="ALL") {
     }
     ##Get gamedata, keep matchId so we get a unique identifier for transformations
     champgames<-dbGetQuery(con,paste0("SELECT matchId,winner,teamPercGold,playerPercGold,item0,item1,item2,item3,item4,item5,item6
-                                      FROM statmous_gamedata.games ",champstring," AND createDate>='",datelimit,"';"))
+                                      FROM statmous_gamedata.games ",champstring," AND createDate>='",patchdate,"';"))
     champgames<-unique(champgames)
         
     ##Set item variables as character class
@@ -104,7 +103,7 @@ makewidedata<-function(champion="ALL") {
     widedata<-widedata[,-zerocol]
     
     ##Remove matchId,teamPercGold, and playerPercGold because we won't need them anymore
-    unneededcols<-c("matchId","teamPercGold","playerPercGold")
+    unneededcols<-c("matchId","teamahead","fedplayer")
     for(colname in unneededcols) {
         colnum<-grep(colname,colnames(widedata))
         widedata<-widedata[,-colnum]
@@ -119,21 +118,30 @@ makewidedata<-function(champion="ALL") {
     return(widedata)
 }
 
-basicstatistics <- function() {
+basicstats <- function() {    
     ##Finds basic info about all champions such as win rate, popularity, and role
-    widedata<-makewidedata("ALL")
     
-    cwinrate<-aggregate(winner~championName,data=widedata,mean)
-    counts<-aggregate(matchId~championName,data=widedata,length)
+    ##Connect to DB and pull all games since last patch
+    con<-reconnectdb("statmous_gamedata")
+    allgames<-dbGetQuery(con,paste0("SELECT * FROM games WHERE createDate>='",patchdate,"';"))
     
+    ##Find winrate and count of games for each champion
+    cwinrate<-aggregate(winner~championName,data=allgames,mean)
+    counts<-aggregate(matchId~championName,data=allgames,length)/nrow(allgames)
+    
+    ##Merge the data for each champion together
     cwinrate<-merge(cwinrate,counts,by="championName")
     
     ##Need to find where the roles are in my desktop
-    ##roles<-read.csv("Champion Roles 
+    roles<-read.csv("champion roles.csv")
     
+    ##Add roles for each champion
     cwinrate<-merge(cwinrate,roles,by="championName")
     
+    ##sort the data and return it
     cwinrate<-cwinrate[order(cwinrate$role,-cwinrate$winner),]
+    
+    return(cwinrate)
 }
 
 splitdf <- function(dataframe, seed=NULL) {
