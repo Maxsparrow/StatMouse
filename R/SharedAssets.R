@@ -17,7 +17,7 @@ reconnectdb <- function(database) {
         Sys.sleep(300)
         
         ##Try pulling again
-        con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password="ML4life",dbname=database))
+        con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password=dbpw,dbname=database))
         
         ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
         if(attemptcount==5 & class(con)=="try-error") {
