@@ -9,7 +9,7 @@ reconnectdb <- function(database) {
     for(i in list) {dbDisconnect(i)}
     
     ##Reconnects to the games database using username and password
-    con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password="ML4life",dbname=database))
+    con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password=dbpw,dbname=database))
     
     attemptcount<-0
     while(class(con)=="try-error") {
