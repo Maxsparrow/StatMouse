@@ -3,6 +3,9 @@ createmodel <- function(champlist="ALL") {
     ##Then you can do a regression analysis on each 'group' created by knn and list the items in 
     ##the best 1 or 2 groups. This seems like the best idea.
     
+    ##Call randomForest library for model creation
+    library(randomForest)
+        
     if(champlist=="ALL") {
         champtable<-champtablecreate()
         champlist<-unique(champtable$champ_name)
@@ -21,18 +24,18 @@ createmodel <- function(champlist="ALL") {
         print(sprintf("Based on %g games",numgames))
         
         ##Split into training set and test set
-        splits<-splitdf(widedata,1234)
+        splits<-splitdf(widedata,4567)
         trainset<-splits$trainset
         testset<-splits$testset
         
         ##Fit model with items, teamahead, fedplayer and no intercept, NOT binomial, has best performance 96% accurate
-        fit<-glm("winner~.-1",data=trainset)
+        fit<-randomForest(winner~.,data=trainset)
         
         ##Output tests of the model showing how accurate it is
         measuremodel(fit,testset)
         
         ##Call function to summarize the fit and create itempower for each item
-        modelsummary<-summarizemodel(fit,trainset)
+        modelsummary<-summarizerf(fit,trainset)
         
         ##Print this to see the results as we load it
         print(modelsummary)
@@ -60,7 +63,7 @@ makewidedata<-function(champion="ALL") {
     con<-reconnectdb("statmous_gamedata")
     
     ##Set the string to use in our search. If all champions are pulled use a blank string
-    if(championName=="ALL") {
+    if(champion=="ALL") {
         champstring<-""
     } else {
         champstring<-paste0("WHERE championName='",champion,"'")
@@ -102,7 +105,7 @@ makewidedata<-function(champion="ALL") {
     zerocol<-grep("^[0]$",colnames(widedata))
     widedata<-widedata[,-zerocol]
     
-    ##Remove matchId,teamPercGold, and playerPercGold because we won't need them anymore
+    ##Remove matchId,teamahead, and fedplayer because we won't need them anymore
     unneededcols<-c("matchId","teamahead","fedplayer")
     for(colname in unneededcols) {
         colnum<-grep(colname,colnames(widedata))
@@ -114,6 +117,9 @@ makewidedata<-function(champion="ALL") {
     for (i in itemcolstart:ncol(widedata)) {
         colnames(widedata)[i]<-paste0("item",colnames(widedata)[i])
     }
+    
+    ##Set winner column to a factor so model fitting sees it as classification problem
+    widedata$winner<-as.factor(widedata$winner)
     
     return(widedata)
 }
@@ -127,7 +133,8 @@ basicstats <- function() {
     
     ##Find winrate and count of games for each champion
     cwinrate<-aggregate(winner~championName,data=allgames,mean)
-    counts<-aggregate(matchId~championName,data=allgames,length)/nrow(allgames)
+    cwinrate$winner<-round(cwinrate$winner,4)*100
+    counts<-aggregate(matchId~championName,data=allgames,function(x) round(length(x)/nrow(allgames),4)*100)
     
     ##Merge the data for each champion together
     cwinrate<-merge(cwinrate,counts,by="championName")
@@ -140,6 +147,8 @@ basicstats <- function() {
     
     ##sort the data and return it
     cwinrate<-cwinrate[order(cwinrate$role,-cwinrate$winner),]
+    
+    colnames(cwinrate)[2:3]<-c("winPerc","gamePerc")
     
     return(cwinrate)
 }
@@ -159,10 +168,10 @@ measuremodel<-function(model,testset) {
     n<-nrow(testset)
     
     ##Since winner is a factor now, change it to numeric
-    testset[,1]<-as.numeric(testset[,1])
+    testset[,1]<-as.numeric(as.character(testset[,1]))
     
     ##Find predictions as binary values
-    pred<-predict(model,testset[,-1],type="response")
+    pred<-as.numeric(as.character(predict(model,testset[,-1],type="response")))
     predbin<-pred
     predbin[predbin<0.5]<-0
     predbin[predbin>=0.5]<-1
@@ -179,6 +188,8 @@ measuremodel<-function(model,testset) {
 }
 
 summarizerf<-function(model,trainset) {
+    library(randomForest)
+    
     ##Summarizes Random Forest models. Input a random forest fit and a training set and it will output itemPower table
     modelsummary<-round(importance(model),6)
     
@@ -193,13 +204,15 @@ summarizerf<-function(model,trainset) {
     }
     modelsummary<-merge(modelsummary,itemtable,by="itemId",all.x=TRUE)
     
+    ##reset winner field as numeric to take mean below
+    trainset$winner<-as.numeric(as.character(trainset$winner))
+    
     ##Find popularity (frequency) of each item to remove any below a certain threshold
     ##Also including win percentage for testing and comparison purposes, but remove before sharing, it is misleading
     itemcounts<-data.frame("itemId"=colnames(trainset),"popularityPerc"=0,"winPerc"=0)
-    #itemcounts$itemId<-as.character(itemcounts$itemId)     ##This seems unnecessary, REMOVE
     for(i in 1:nrow(itemcounts)) {
-        itemcounts$popularityPerc[i]<-sum(trainset[,as.character(itemcounts$itemId[i])])/nrow(trainset)
-        itemcounts$winPerc[i]<-mean(trainset[as.character(itemcounts$itemId[i])>0,"winner"])
+        itemcounts$popularityPerc[i]<-round(sum(trainset[,as.character(itemcounts$itemId[i])])/nrow(trainset),4)*100
+        itemcounts$winPerc[i]<-round(mean(trainset[trainset[,as.character(itemcounts$itemId[i])]>0,"winner"]),4)*100
     }
     
     ##Remove the item word so we can merge in to the modelsummary
@@ -207,14 +220,14 @@ summarizerf<-function(model,trainset) {
     modelsummary<-merge(modelsummary,itemcounts,by="itemId",all.x=TRUE)
     
     ##Keep only items that are in more than 1% of games (2% of training set), consider tinkering with this as we get bigger data
-    modelsummary<-modelsummary[modelsummary$popularityPerc>0.02,] 
+    modelsummary<-modelsummary[modelsummary$popularityPerc>2,] 
     
     ##Create itempower, normalized with mean 5 and standard deviation 2, set max as 10 and min as 0
     ##First remove the rows for teamahead and fed player
     removerows<-c("teamahead","fedplayer","teamPercGold","playerPercGold","Intercept")
     removerowsnum<-unlist(sapply(removerows,function(x) grep(x,as.character(modelsummary$itemId))))
-    itempower<-modelsummary[-removerowsnum,"MeanDecreaseGini"]
-    itempowerId<-modelsummary[-removerowsnum,"itemId"]
+    itempower<-as.numeric(as.character(modelsummary[-removerowsnum,"MeanDecreaseGini"]))
+    itempowerId<-as.numeric(as.character(modelsummary[-removerowsnum,"itemId"]))
     ipmean<-mean(itempower)
     ipsd<-sd(itempower)
     itempower<-2*((itempower-ipmean)/ipsd+2.5)
