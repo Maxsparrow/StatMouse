@@ -24,7 +24,7 @@ getgames<-function(summonerids=NA,limit=50000) {
     ##Rearrange summonerids so we pull them in random order
     ##And remove extra summonerids since we don't need to use quite so many
     ##The limit must be greater if we have a low number of days we are pulling in, since there are fewer matches for each summoner
-    summonerids<-sample(summonerids,limit*7/numdays)
+    summonerids<-sample(summonerids,limit*5)
     
     ##Create data frame for later if it doesn't exist already
     if(!exists("games")) {games<-data.frame()}
@@ -91,7 +91,8 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     
     ##Use matchId to pull the game info
     request <- paste("/api/lol/na/v2.2/match/",matchId,sep="")
-    apidata<-apiquery(request,requesttype,requestitem)    
+    apidata<-apiquery(request,requesttype,requestitem)
+    
     ##If the data pulled back by the request is bad, create an all 0s matrix
     ##in the main function, this result is skipped
     if(is.na(apidata[1])) {return(matrix(rep(0,100),10))} ##Error catching - should only happen after displaying status code errors
@@ -105,7 +106,7 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     gamedata <- gamedata[validcolumns]  
     
     ##Filter stats for only needed columns
-    validcolumns <- c("winner","goldEarned","item0","item1","item2","item3","item4","item5","item6")
+    validcolumns <- c("winner","goldEarned","kills","deaths","assists","item0","item1","item2","item3","item4","item5","item6")
     stats <- stats[validcolumns]
     
     ##Checks if any columns are missing because of null values, if so, adds NULLs 
@@ -134,7 +135,11 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     
     ##Add createDate to the game data
     createDate<-apidata$matchCreation 
-    gamedata<-cbind(createDate,gamedata)
+    gamedata<-cbind(createDate,gamedata)    
+    
+    ##Add matchDuration to the game data
+    gamedata<-cbind(apidata$matchDuration,gamedata)
+    colnames(gamedata)[1]<-"matchDuration"
     
     ##Add matchId to the game data
     gamedata<-cbind(matchId,gamedata)
@@ -170,48 +175,22 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
         gamedata$playerPercGold[i]<-round(gamedata$goldEarned[i]/totalgold,4)    
     }
     
+    ##Add KDA for each player
+    gamedata$KDA<-round((gamedata$kills+gamedata$assists)/(gamedata$deaths+1),4)
+    
     ##Adds champion names to the table
     gamedata<-merge(gamedata,champtable,by.x="championId",by.y="champ_id")
     colnames(gamedata)[ncol(gamedata)]<-"championName"
     
     ##Resort the column names in the format that I Want. and put it back in order the way it was before the merge
-    gamedata<-gamedata[c("summonerId","summonerName","matchId","createDate","participantId","teamId","championId","championName","winner",
-               "goldEarned","playerPercGold","teamPercGold","item0","item1","item2","item3","item4","item5","item6")]
+    gamedata<-gamedata[c("summonerId","summonerName","matchId","matchDuration","createDate","participantId","teamId","championId","championName","winner",
+               "kills","deaths","assists","KDA","goldEarned","playerPercGold","teamPercGold","item0","item1","item2","item3","item4","item5","item6")]
     gamedata<-gamedata[order(gamedata$participantId),]
     
     ##Set winner as binary numeric
     gamedata$winner<-as.numeric(gamedata$winner)
         
     return(gamedata)
-}
-
-tryget<-function(apiurl,requesttype,requestitem) {
-    ##Called by apiquery to check if we can connect to the server. If we get an error using GET 
-    ##it will wait some time then try again
-    data<-try(GET(apiurl))
-    
-    attemptcount<-0
-    while(class(data)=="try-error") {
-        print(paste("Could not connect to API server. It has been",(attemptcount*5),"minutes without connection. Waiting 5 minutes then trying again."))
-        Sys.sleep(300)
-        
-        ##Try pulling again
-        data<-try(GET(apiurl))
-        
-        ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
-        if(attemptcount==5 & class(data)=="try-error") {
-            print("After retrying for 30 minutes, could not connect to server, ending execution")
-            stop(endfunction(requesttype,games))
-        }
-        
-        attemptcount<-attemptcount+1
-    }
-        
-    ##Add the current time to the request count vector
-    requestcount<-c(requestcount,Sys.time())
-    requestcount<<-requestcount    
-    
-    return(data)
 }
 
 pauseforratelimit<-function(timelimit,requesttypecount,requesttype) {

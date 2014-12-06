@@ -157,3 +157,32 @@ apiquery <- function(request,requesttype = NA,requestitem = 0) {
     
     return(apidata)
 }
+
+tryget<-function(apiurl,requesttype,requestitem) {
+    ##Called by apiquery to check if we can connect to the server. If we get an error using GET 
+    ##it will wait some time then try again
+    data<-try(GET(apiurl))
+    
+    attemptcount<-0
+    while(class(data)=="try-error") {
+        print(paste("Could not connect to API server. It has been",(attemptcount*5),"minutes without connection. Waiting 5 minutes then trying again."))
+        Sys.sleep(300)
+        
+        ##Try pulling again
+        data<-try(GET(apiurl))
+        
+        ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
+        if(attemptcount==5 & class(data)=="try-error") {
+            print("After retrying for 30 minutes, could not connect to server, ending execution")
+            stop(endfunction(requesttype,games))
+        }
+        
+        attemptcount<-attemptcount+1
+    }
+    
+    ##Add the current time to the request count vector
+    requestcount<-c(requestcount,Sys.time())
+    requestcount<<-requestcount    
+    
+    return(data)
+}
