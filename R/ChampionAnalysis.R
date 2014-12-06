@@ -134,7 +134,7 @@ basicstats <- function() {
     ##Find winrate and count of games for each champion
     cwinrate<-aggregate(winner~championName,data=allgames,mean)
     cwinrate$winner<-round(cwinrate$winner,4)*100
-    counts<-aggregate(matchId~championName,data=allgames,function(x) round(length(x)/nrow(allgames),4)*100)
+    counts<-aggregate(matchId~championName,data=allgames,function(x) round(length(x)/length(unique(allgames$matchId)),4)*100)
     
     ##Merge the data for each champion together
     cwinrate<-merge(cwinrate,counts,by="championName")

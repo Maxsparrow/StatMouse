@@ -5,8 +5,6 @@ body {
 	background-color:#333333;
 }
 
-div {}
-
  /**********HEADER**********/
    
 #Header {
@@ -17,9 +15,6 @@ div {}
 }
 
 /*setting widths of header blocks*/
-#logo{
-	width:20%;
-}
 
 #searchbar{
 	width:75%;	
@@ -30,24 +25,24 @@ div {}
 }
 
 .NavBarItem {
-	width: 31.5%;
+	width:17%;
 }
 
 /*setting style of header blocks*/
 #Header div{
-    display:inline-block;
-    padding:0;
+    	display:inline-block;
+    	padding:0;
 	margin:0;
 	height:40px;
 	font-size:1.5em;
-
+	
 	color:#000000;
 	background-color:#bdbbbd;
 	-moz-box-shadow:inset -4px -4px 0px 0px #a35b02;
 	-webkit-box-shadow:inset -4px -4px 0px 0px #a35b02;
 	box-shadow:inset -4px -4px 0px 0px #a35b02;
 	border-radius:7px;
-
+	
 	margin-top:4px;
 } 
 
