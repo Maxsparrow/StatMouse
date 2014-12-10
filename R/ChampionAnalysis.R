@@ -64,13 +64,15 @@ makewidedata<-function(champion="ALL") {
     
     ##Set the string to use in our search. If all champions are pulled use a blank string
     if(champion=="ALL") {
-        champstring<-""
+        champstring<-NULL
     } else {
-        champstring<-paste0("WHERE championName='",champion,"'")
+        champstring<-paste0("championName='",champion,"' AND ")
     }
+    
     ##Get gamedata, keep matchId so we get a unique identifier for transformations
-    champgames<-dbGetQuery(con,paste0("SELECT matchId,winner,teamPercGold,playerPercGold,item0,item1,item2,item3,item4,item5,item6
-                                      FROM statmous_gamedata.games ",champstring," AND createDate>='",patchdate,"';"))
+    ##Don't get item6 column for teinkets for the time being, they should be analyzed separately
+    champgames<-dbGetQuery(con,paste0("SELECT matchId,matchDuration,KDA,winner,teamPercGold,playerPercGold,item0,item1,item2,item3,item4,item5
+                                      FROM statmous_gamedata.games WHERE ",champstring," createDate>='",patchdate,"';"))
     champgames<-unique(champgames)
         
     ##Set item variables as character class
@@ -79,9 +81,6 @@ makewidedata<-function(champion="ALL") {
         champgames[,i]<-as.character(champgames[,i])
     }    
     
-    ##Remove item6 column for trinkets for the time being, they should be analyzed separately
-    champgames<-champgames[,-grep("item6",colnames(champgames))]
-    
     ##Experiment with these two variables and see if they give better linear regression results - i like these so far
     champgames$teamahead<-0
     champgames[champgames$teamPercGold>0.50,"teamahead"]<-1   
@@ -89,7 +88,7 @@ makewidedata<-function(champion="ALL") {
     champgames[champgames$playerPercGold>0.12,"fedplayer"]<-1 
     
     ##Set variables to keep as static vars
-    idvars<-c("matchId","winner","teamPercGold","playerPercGold","teamahead","fedplayer")
+    idvars<-c("matchId","matchDuration","KDA","winner","teamPercGold","playerPercGold","teamahead","fedplayer")
     
     ##Melt data frame
     long.champgames<-melt(champgames,id.vars=idvars)  
@@ -98,8 +97,8 @@ makewidedata<-function(champion="ALL") {
     idsum<-paste(idvars,collapse=" + ")
     
     ##recast the data adding up the count of each item for each match/summoner
-    #widedata<-dcast(long.champgames,paste(idsum,"value",sep="~"),length,fill=0)  ##Makes each item variable a count (can be more than 1 of an item)
-    widedata<-dcast(long.champgames,paste(idsum,"value",sep="~"),function(x) 1,fill=0)   ##Makes each item variable binary based on whether it exists
+    widedata<-dcast(long.champgames,paste(idsum,"value",sep="~"),length,fill=0)  ##Makes each item variable a count (can be more than 1 of an item)
+    #widedata<-dcast(long.champgames,paste(idsum,"value",sep="~"),function(x) 1,fill=0)   ##Makes each item variable binary based on whether it exists
     
     ##Cut out the '0' column indicating missing items
     zerocol<-grep("^[0]$",colnames(widedata))
