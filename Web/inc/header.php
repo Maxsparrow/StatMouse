@@ -8,16 +8,18 @@
     <link href='http://fonts.googleapis.com/css?family=Dosis:300,500,700|Droid+Sans:400,700' rel='stylesheet' type='text/css'>
 	<link type="text/css" rel="stylesheet" href="HomePageStyles.css" />
 	<link type="text/css" rel="stylesheet" href="Responsive.css" />
+	<!--<link type="text/css" rel="stylesheet" href="bootstrap/css/bootstrap.min.css" />-->
     <title>	StatMouse</title>
 
     <!--[if IE]>
     <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <script src="bootsrap/js/bootsrap.min.js"></script>
     <![endif]-->
   </head>
   <body>
   
 	<div id="Header">	
-		<a href="index.php"><img src="img/StatMouse Logo.png" width="48" height="76" ></a>
+		<a href="index.php"><img src="img/StatMouse Logo.png" width="48" height="76" /></a>
 		
 		<a href="index.php"><div class="NavBarItem">StatMouse</div></a>		
 		
