@@ -9,7 +9,7 @@
     <link href='http://fonts.googleapis.com/css?family=Dosis:300,500,700|Droid+Sans:400,700' rel='stylesheet' type='text/css'>
 	<link type="text/css" rel="stylesheet" href="bootstrap/css/bootstrap.min.css" />
 	<link type="text/css" rel="stylesheet" href="HomePageStyles.css" />
-    <title>	StatMouse</title>
+    <title>StatMouse</title>
 
     <!--[if IE]>
     <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
@@ -19,7 +19,7 @@
   <body>
   
   	<div class="navbar-header">
-		<a href="index.php" id="logo"><img src="img/StatMouse Logo.png" width="48px" height="76px" /></a>
+		<a href="index.php" id="logo"><img src="img/StatMouse Logo.png" width="48px" height="76px"/></a>
 	</div>
 
 	<div role="navigation">	
@@ -32,6 +32,14 @@
 			<li role="presentation" <?php if ($pageclass=="champions") echo 'class="active"'; ?>><a href="champions.php">
 				Champions
 			</a></li>
+			
+			
+			<form class="navbar-form navbar-left" role="search" method="get" action="search.php">
+				<div class="form-group">
+					<input type="text" name="go" class="form-control" placeholder="Champion Name">
+				</div>
+				<button type="submit" value="Submit" class="btn btn-default">Submit</button>
+			</form>
 			 
 		 </ul>
 	</div>

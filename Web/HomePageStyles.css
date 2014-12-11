@@ -42,6 +42,11 @@ body {
 	background-color:#a35b02;
 }
 
+.nav-pills form {
+	margin-top:20px;
+	padding-top:10px;
+}
+
 /**********Body**********/
 
 #newsbody, #itemsbody, #championsbody {
@@ -64,11 +69,6 @@ body {
 	border-radius:20px;	
 	margin-top:0%;
 	padding: 1% 3%;
-}
-
-.jumbotron {	
-	/*makes the container wider than default, consider playing with this*/	
-	min-width:80%;
 }
 
 .btn-primary:link,

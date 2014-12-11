@@ -1,4 +1,3 @@
-
 <?php $pageclass="index";
 include('inc/header.php'); ?>
 
@@ -9,7 +8,7 @@ include('inc/header.php'); ?>
 
 		<p>Welcome to StatMouse! Here we use statistics to help League of Legends players make the best item choices they can using adjusted win rate calculations. These calculations account for gold differentials between teams, so games where one team is way ahead won't count as much towards an item's winrate.</p>
         
-        <p>Current data is available for patch 4.20 on the Champions tab. Use the Page buttons at the bottom to find your champion. Select your champion and best items will be shown for that champion on a scale from 0-10, 10 being the best. </p>
+        <p>Current data is available for patch 4.20 on the Champions tab. Find your champion by using the search box or the page buttons at the bottom of the champion page. Select your champion and best items will be shown for that champion on a scale from 0-10, 10 being the best. </p>
         
         <p>Right now game-length and KDA are not accounted for so some items like Mejai's Soulstealer on Janna, and Last Whisper on multiple champions appear stronger than they should, so please keep that in mind.</p>
 

@@ -7,13 +7,8 @@ include('model/champion.php');
 	<?php
 	include('connections.php');
 	
-	$database="statmous_analysis";		
-	//REMEBER TO CHANGE TO localhost before uploading
-	$db = new PDO('mysql:host=localhost;dbname='.$database.';charset=utf8', $username, $password);
-	$db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-	$db->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-	
 	$champion = $_GET['champion'];
+	echo $champion;
 	if(isset($_GET['pg'])){
 		$page = $_GET['pg'];
 	} else {
@@ -40,6 +35,7 @@ include('model/champion.php');
 		<table class="table-bordered">
 		<thead><tr><th>Item Name</th><th>Popularity</th><th>Item Power</th></tr></thead>
 		<tbody>
+		
 		<?php
 			$stmt = $db->prepare($query);
 			$stmt->bindValue(':champion', $champion->name, PDO::PARAM_STR);
@@ -53,23 +49,17 @@ include('model/champion.php');
 	    			echo "<td style='text-align:center;'>".$row['itemPower']."</td></tr>";
     		}
 		?>
+		
 		</tbody>
 		</table>	
 
     	<?php
 		//Pagination CBJ 12.10.14
 			echo "<nav><ul class='pager'>";
-				echo "<li class='previous ";
-				if ($page==0) {echo "disabled";}
-				echo "'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=";
-				if ($page==0) {echo $page;} else {echo $page-1;}
-				echo "' style='color: black;' > Previous Page </a></li>";
-
-				echo "<li class='next ";
-				if(count($results)<$numPerPage) {echo "disabled";}
-				echo "'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=";
-				if(count($results)<$numPerPage) {echo $page;} else {echo $page+1;}
-				echo "' style='color: black;' > Next Page </a></li>";
+			
+				if ($page!=0) echo "<li class='previous'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=".($page-1)."' style='color: black;'> Previous Page </a></li>";			
+				if (count($results)>=$numPerPage) echo "<li class='next'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=".($page+1)."' style='color: black;'> Next Page </a></li>";
+				
 			echo "</ul></nav>";
     	?>	
 	</div>

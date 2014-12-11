@@ -6,30 +6,17 @@ include('model/champion.php');
 	
 	<?php
 	include('connections.php');
-	
-	$database="statmous_analysis";	
-	//REMEBER TO CHANGE TO localhost before uploading
-	$db = new PDO('mysql:host=localhost;dbname='.$database.';charset=utf8', $username, $password);
-	$db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-	$db->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-	
+
 	if(isset($_GET['pg'])){
 		$page = $_GET['pg'];
 	} else {
 		$page = 0;
 	}
 
-	if($page<0){
-		$page=0;
-	} else if ($page>2){
-		$page=2;
-	}
-
-
 	if(isset($_GET['numPerPage'])){
 		$numPerPage = $_GET['numPerPage'];
 	} else {
-		$numPerPage =50;
+		$numPerPage = 50;
 	}
 	?>
 	
@@ -47,24 +34,26 @@ include('model/champion.php');
 			foreach($results as $row) {
 				$champion = new Champion($row['championName']);
 				$championurl = "<a href='".$champion->GetChampionPageUrl()."' style='color: black;'>";
-    			echo "<div style='display:inline-block;max-width:90px;margin:6px;'>".$championurl;
-    			echo "<figure><img style='max-width:100%;' src='".$champion->GetImagePath()."' /><figcaption style='font-size:12px;text-align:center;'>".$row['championName']."</figcaption></figure>";
-    			echo "</a></div>";
-    			$rowcounter+=1;
-    		}
+	    			echo "<div style='display:inline-block;max-width:90px;margin:6px;'>".$championurl;
+	    			echo "<figure><img style='max-width:100%;' src='".$champion->GetImagePath()."' /><figcaption style='font-size:12px;text-align:center;'>".$row['championName']."</figcaption></figure>";
+	    			echo "</a></div>";
+	    			$rowcounter+=1;
+    			}
 		?> 
 		
     	<?php
 		//Pagination CBJ 12.10.14
-		echo "<nav><ul class='pagination'>";
+		echo "<nav style='margin-left:25%;'><ul class='pagination'>";
+		
 			echo "<li ";
-			if($page==0) echo "class='disabled'";
-			echo "><a href='champions.php?pg=".($page-1)."'><span aria-hidden='true'>&laquo;</span><span class='sr-only'>Previous</span></a></li>";
+			if($page==0) echo "class='disabled'><a href='#'>";
+			else echo "><a href='champions.php?pg=".($page-1)."'>";			
+			echo "<span aria-hidden='true'>&laquo;</span><span class='sr-only'>Previous</span></a></li>";
 			
 			for($i=0;$i<=2;$i++) {
 				echo "<li ";
-				if($page==$i) echo "class='active'";
-				echo "><a href='champions.php?pg=".$i."'>";
+				if($page==$i) echo "class='active'><a href='#'>";
+				else echo "><a href='champions.php?pg=".$i."'>";
 
 				if($i==0) {
 					echo "Aatrox - Leblanc";
@@ -80,8 +69,10 @@ include('model/champion.php');
 			}
 
 			echo "<li ";
-			if($page==2) echo "class='disabled'";
-			echo "><a href='champions.php?pg=".($page+1)."'><span aria-hidden='true'>&raquo;</span><span class='sr-only'>Next</span></a></li>";
+			if($page==2) echo "class='disabled'><a href='#'>";
+			else echo "><a href='champions.php?pg=".($page+1)."'>";
+			echo "<span aria-hidden='true'>&raquo;</span><span class='sr-only'>Next</span></a></li>";
+			
 		echo "</ul></nav>";
 		?>
 	</div>
