@@ -6,55 +6,41 @@ body {
 }
 
  /**********HEADER**********/
-   
-#Header {
-	max-width: 100%;
-	padding:0;
-	margin:0;
-	font-family: 'Dosis', sans-serif;
+
+#logo {
+	background-color:#333333;
 }
 
-/*setting widths of header blocks*/
-
-#searchbar{
-	width:75%;	
+.navbar-header {
+	margin:5px;
 }
 
-#searchbar #search {
-	width:200px;
+.nav-pills li a {
+	font-size:22px;
+	margin-top:20px;
+	padding-top:10px;
+	text-align:center;
+	height:50px;
+	width: 150px;
+	background-color:#777;
+	color:#000;
+	border-style:solid;
+	border-width:1px;
 }
 
-.NavBarItem {
-	width:17%;
+.nav > li > a:hover,
+.nav > li > a:focus {
+  text-decoration: none;
+  background-color: #a35b02;
+  color:#000;
+}	
+
+.nav-pills > li.active > a,
+.nav-pills > li.active > a:hover,
+.nav-pills > li.active > a:focus  {
+	color:#000;
+	background-color:#a35b02;
 }
-
-/*setting style of header blocks*/
-#Header div{
-    	display:inline-block;
-    	padding:0;
-	margin:0;
-	height:40px;
-	font-size:1.5em;
-	
-	color:#000000;
-	background-color:#bdbbbd;
-	-moz-box-shadow:inset -4px -4px 0px 0px #a35b02;
-	-webkit-box-shadow:inset -4px -4px 0px 0px #a35b02;
-	box-shadow:inset -4px -4px 0px 0px #a35b02;
-	border-radius:7px;
-	
-	margin-top:4px;
-} 
-
-#Header a div:hover {
-	color:#a35b02;
-}
-  
-
-#Header a div:active {
-	text-decoration: underline;
-}
-
 
 /**********Body**********/
 
@@ -73,15 +59,103 @@ body {
 	border-radius:7px;
 }
 
-/**********Footer**********/
-
-#Footer {
-	bottom:0;
-	font-size:0.75em;
+.container {
+	background-color: #bdbbbd;
+	border-radius:20px;	
+	margin-top:0%;
+	padding: 1% 3%;
 }
 
-#Footer div {
-	display:inline-block;
+.jumbotron {	
+	/*makes the container wider than default, consider playing with this*/	
+	min-width:80%;
+}
+
+.btn-primary:link,
+.btn-primary:visited {
+  color: #000;
+  background-color: #777;
+  border-color: #000;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary.focus,
+.btn-primary:active,
+.btn-primary.active,
+.open > .dropdown-toggle.btn-primary {
+  color: #000;
+  background-color: #a35b02;
+  border-color: #000;
+}
+
+.pagination > li > a,
+.pagination > li.disabled > a,
+.pagination > li.disabled > a:hover,
+.pagination > li.disabled > a:focus  {
+  background-color: #777;
+  color:#000;
+  border-color:#000;
+}
+
+.pagination > li > a:hover,
+.pagination > li > a:focus{
+  text-decoration: none;
+  background-color: #a35b02;
+  color:#000;
+border-color:#000; 
+}	
+
+.pagination > li.active > a,
+.pagination > li.active > a:hover,
+.pagination > li.active > a:focus  {
+	color:#000000;
+	background-color:#a35b02;
+	border-color:#000; 
+}
+.pager > li > a,
+.pager > li.disabled > a,
+.pager > li.disabled > a:hover,
+.pager > li.disabled > a:focus  {
+  background-color: #777;
+  color:#000;
+  border-color:#000;
+}
+
+.pager > li > a:hover,
+.pager > li > a:focus  {
+	color:#000000;
+	background-color:#a35b02;
+	border-color:#000; 
+}
+
+.table-bordered {
+	border-color: #000;
+}
+
+.table-bordered > thead > tr > th,
+.table-bordered > tbody > tr > th,
+.table-bordered > tfoot > tr > th,
+.table-bordered > thead > tr > td,
+.table-bordered > tbody > tr > td,
+.table-bordered > tfoot > tr > td {
+	padding:3px;
+	border-color:#000;
+}
+
+/**********Footer**********/
+
+.footer {
+	position:relative;
+	font-size:0.75em;
+	clear:both;
+	padding-top:3%;
+	padding-left:20px;
+	color:#bdbbbd;
+}
+
+.footer div {
+	margin-right:50px;
 }
 
 #contact {
