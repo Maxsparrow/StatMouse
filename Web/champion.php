@@ -21,7 +21,6 @@ include('model/champion.php');
 		$numPerPage = 13;
 	}
 	
-	$query = "SELECT * FROM itempower where championName = :champion order by itemPower desc limit :numPerPage offset :offset";
 	?>
 	
 	<div class="container">
@@ -30,28 +29,38 @@ include('model/champion.php');
 		echo "<h2><img style='width:90px;' src='".$champion->GetImagePath()."' /> ";
 		echo $champion->name;
 		echo "</h2>";
-		?>
 		
-		<table class="table-bordered">
-		<thead><tr><th>Item Name</th><th>Popularity</th><th>Item Power</th></tr></thead>
-		<tbody>
+		//For loop to repeat 3 times, output early, mid, and late game items
+		for ($i=1;$i<=3;$i+=1) {
+			if ($i==1) $phase = 'Early';
+			else if ($i==2) $phase = 'Mid';
+			else if ($i==3) $phase = 'Late';
+			?>
 		
-		<?php
-			$stmt = $db->prepare($query);
-			$stmt->bindValue(':champion', $champion->name, PDO::PARAM_STR);
-			$stmt->bindValue(':numPerPage', $numPerPage, PDO::PARAM_INT);
-			$stmt->bindValue(':offset', $page*$numPerPage, PDO::PARAM_INT);
-			$stmt->execute();
-			$results = $stmt->fetchAll();
-			foreach($results as $row) {
-	    			echo "<tr><td><img style='height: 50%;' src='/img/item/".$row['itemId'].".png' /> ".$row['itemName']."</td>";
-	    			echo "<td style='text-align:center;'>".$row['popularityPerc']."%</td>";
-	    			echo "<td style='text-align:center;'>".$row['itemPower']."</td></tr>";
-    		}
-		?>
-		
-		</tbody>
-		</table>	
+			<div class="col-md-4">
+			<table class="table-bordered"><caption style='font-size:24px;color:#000;font-weight:bold;'><?php echo $phase; ?> Game</caption>
+			<thead><tr><th>Item Name</th><th>Item Power</th></tr></thead>
+			<tbody>
+			
+			<?php		
+				$query = "SELECT * FROM itempower where championName = :champion AND analysisDate > '2014-12-11' AND gamePhase = :phase order by itemPower desc limit :numPerPage offset :offset";
+				$stmt = $db->prepare($query);
+				$stmt->bindValue(':champion', $champion->name, PDO::PARAM_STR);
+				$stmt->bindValue(':numPerPage', $numPerPage, PDO::PARAM_INT);
+				$stmt->bindValue(':offset', $page*$numPerPage, PDO::PARAM_INT);
+				$stmt->bindValue(':phase',$phase,PDO::PARAM_STR);
+				$stmt->execute();
+				$results = $stmt->fetchAll();
+				foreach($results as $row) {
+		    			echo "<tr><td><img style='height: 50%;' src='/img/item/".$row['itemId'].".png' /> ".$row['itemName']."</td>";
+		    			echo "<td style='text-align:center;'>".$row['itemPower']."</td></tr>";
+	    		}
+			?>
+			 
+			</tbody>
+			</table>
+			</div>	
+		<?php } ?>
 
     	<?php
 		//Pagination CBJ 12.10.14
