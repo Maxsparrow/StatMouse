@@ -6,10 +6,12 @@ createmodel <- function(champlist="ALL") {
     ##Call randomForest library for model creation
     library(randomForest)
         
+    ##If we want to analyze all champions, find the full list of champions and go through them, replace apostrophes with double apostrophes for SQL purposes
     if(champlist=="ALL") {
         champtable<-champtablecreate()
         champlist<-unique(champtable$champ_name)
         champlist<-gsub("'","''",champlist)
+        champlist<-champlist[!grepl("Rek",champlist)] ##Remove Rek'Sai for now because we have no data for her yet
     }
     
     allchamps<-data.frame()
@@ -23,19 +25,8 @@ createmodel <- function(champlist="ALL") {
         print(sprintf("Analyzing %s",champion))
         print(sprintf("Based on %g games",numgames))
         
-        ##Split into training set and test set
-        splits<-splitdf(widedata,4567)
-        trainset<-splits$trainset
-        testset<-splits$testset
-        
-        ##Fit model with items, teamahead, fedplayer and no intercept, NOT binomial, has best performance 96% accurate
-        fit<-randomForest(winner~.,data=trainset)
-        
-        ##Output tests of the model showing how accurate it is
-        measuremodel(fit,testset)
-        
         ##Call function to summarize the fit and create itempower for each item
-        modelsummary<-summarizerf(fit,trainset)
+        modelsummary<-gamephaseitemsummary(widedata)
         
         ##Print this to see the results as we load it
         print(modelsummary)
@@ -48,6 +39,9 @@ createmodel <- function(champlist="ALL") {
         ##Add this champion to the list of all champions
         allchamps<-rbind(modelsummary,allchamps)
     }
+    
+    ##Convert names back to one apostrophe for Cho'Gath and the like, I think they will still load into the database fine
+    allchamps$championName<-gsub("''","'",allchamps$championName)
     
     return(allchamps)
 }
@@ -64,15 +58,13 @@ makewidedata<-function(champion="ALL") {
     
     ##Set the string to use in our search. If all champions are pulled use a blank string
     if(champion=="ALL") {
-        champstring<-NULL
+        champstring<-""
     } else {
-        champstring<-paste0("championName='",champion,"' AND ")
+        champstring<-paste0("WHERE championName='",champion,"'")
     }
-    
     ##Get gamedata, keep matchId so we get a unique identifier for transformations
-    ##Don't get item6 column for teinkets for the time being, they should be analyzed separately
-    champgames<-dbGetQuery(con,paste0("SELECT matchId,matchDuration,KDA,winner,teamPercGold,playerPercGold,item0,item1,item2,item3,item4,item5
-                                      FROM statmous_gamedata.games WHERE ",champstring," createDate>='",patchdate,"';"))
+    champgames<-dbGetQuery(con,paste0("SELECT matchId,winner,matchDuration,KDA,goldEarned,teamPercGold,playerPercGold,item0,item1,item2,item3,item4,item5,item6
+                                      FROM statmous_gamedata.games ",champstring," AND createDate>='",patchdate,"';"))
     champgames<-unique(champgames)
         
     ##Set item variables as character class
@@ -81,14 +73,18 @@ makewidedata<-function(champion="ALL") {
         champgames[,i]<-as.character(champgames[,i])
     }    
     
+    ##Remove item6 column for trinkets for the time being, they should be analyzed separately
+    champgames<-champgames[,-grep("item6",colnames(champgames))]
+    
     ##Experiment with these two variables and see if they give better linear regression results - i like these so far
     champgames$teamahead<-0
     champgames[champgames$teamPercGold>0.50,"teamahead"]<-1   
     champgames$fedplayer<-0
     champgames[champgames$playerPercGold>0.12,"fedplayer"]<-1 
+    champgames$gameGold<-champgames$goldEarned/champgames$playerPercGold
     
     ##Set variables to keep as static vars
-    idvars<-c("matchId","matchDuration","KDA","winner","teamPercGold","playerPercGold","teamahead","fedplayer")
+    idvars<-c("matchId","winner","matchDuration","KDA","goldEarned","gameGold","teamPercGold","playerPercGold","teamahead","fedplayer")
     
     ##Melt data frame
     long.champgames<-melt(champgames,id.vars=idvars)  
@@ -223,7 +219,7 @@ summarizerf<-function(model,trainset) {
     
     ##Create itempower, normalized with mean 5 and standard deviation 2, set max as 10 and min as 0
     ##First remove the rows for teamahead and fed player
-    removerows<-c("teamahead","fedplayer","teamPercGold","playerPercGold","Intercept")
+    removerows<-c("teamahead","fedplayer","teamPercGold","playerPercGold","Intercept","gameGold","goldEarned","KDA","matchDuration")
     removerowsnum<-unlist(sapply(removerows,function(x) grep(x,as.character(modelsummary$itemId))))
     itempower<-as.numeric(as.character(modelsummary[-removerowsnum,"MeanDecreaseGini"]))
     itempowerId<-as.numeric(as.character(modelsummary[-removerowsnum,"itemId"]))
@@ -239,6 +235,65 @@ summarizerf<-function(model,trainset) {
     modelsummary<-modelsummary[order(-modelsummary$itempower),]
     
     return(modelsummary)
+}
+
+gamephaseitemsummary<-function(trainset,limitingvar="matchDuration") {  
+    ##Finds best items using a training set and randomForest algorithm broken down by early, mid, and late game
+    ##Currently matchDuration is used to determine game phase, but other variables like champion level, tower, dragon, or baron kills could be used later
+    library(randomForest)
+    
+    ##Create a subset of the training set for only games that were won in the early game and fit a randomForest
+    trainearly<-trainset[trainset[,limitingvar]<=quantile(trainset[,limitingvar],0.1),]  
+    fitearly<-randomForest(winner~.,data=trainearly)
+    
+    ##Output accuracy to show progress as we go, summarize the randomForest importance and find the best items from it
+    measuremodel(fitearly,trainearly) ##Only output to show accuracy as we go
+    summaryearly<-summarizerf(fitearly,trainearly)
+    summaryearly$gamePhase<-"early"
+    
+    ##Create a subset of the training set for only games that were won in the mid game and fit a randomForest
+    trainmid<-trainset[trainset[,limitingvar]>quantile(trainset[,limitingvar],0.1) & trainset[,limitingvar]<quantile(trainset[,limitingvar],0.9),]
+    fitmid<-randomForest(winner~.,data=trainmid)
+    
+    ##Output accuracy to show progress as we go, summarize the randomForest importance and find the best items from it
+    measuremodel(fitmid,trainmid) 
+    summarymid<-summarizerf(fitmid,trainmid)
+    summarymid$gamePhase<-"mid"
+    
+    ##Create a subset of the training set for only games that were won in the late game and fit a randomForest
+    trainlate<-trainset[trainset[,limitingvar]>=quantile(trainset[,limitingvar],0.9),]
+    fitlate<-randomForest(winner~.,data=trainlate)
+    
+    ##Output accuracy to show progress as we go, summarize the randomForest importance and find the best items from it
+    measuremodel(fitlate,trainlate)
+    summarylate<-summarizerf(fitlate,trainlate)
+    summarylate$gamePhase<-"late"
+    
+    ##Combine early, mid, and late game summaries
+    combinedsummary<-rbind(summaryearly,summarymid,summarylate)
+    
+    ##Loop through every unique item in our combined list, and find which gamePhase it is best in, then add that row, including its itempower, to the 
+    ##final data frame for output
+    finalsummary<-data.frame()
+    curitems<-unique(combinedsummary$itemId)
+    for(id in curitems) {
+        cursummary<-combinedsummary[combinedsummary$itemId==id,]
+        finalsummary<-rbind(finalsummary,cursummary[order(-cursummary$itempower),][1,])
+    }
+    
+    ##Remove MeanDecreaseGini column since we don't need it and any non item rows    
+    finalsummary<-subset(finalsummary,select=-c(MeanDecreaseGini))
+    finalsummary<-subset(finalsummary,!is.na(finalsummary$itempower))
+    
+    ##Sort by gamePhase and then itempower
+    finalsummary<-finalsummary[order(finalsummary$gamePhase,-finalsummary$itempower),]
+    
+    ##Keep only the top 10 items for each gamePhase. Could shorten further later on, but this is good for now
+    finalsummary2<-rbind(head(finalsummary[finalsummary$gamePhase=="early",],10),
+                         head(finalsummary[finalsummary$gamePhase=="mid",],10),
+                         head(finalsummary[finalsummary$gamePhase=="late",],10))
+        
+    return(finalsummary2)    
 }
 
 summarizereg<-function(model,trainset) {
@@ -292,7 +347,7 @@ summarizereg<-function(model,trainset) {
     
     ##Create itempower, normalized with mean 5 and standard deviation 2, set max as 10 and min as 0
     ##First remove the rows for teamahead and fed player
-    removerows<-c("teamahead","fedplayer")
+    removerows<-c("teamahead","fedplayer","Intercept","matchDuration","playerPercGold","winner")
     removerowsnum<-unlist(sapply(removerows,function(x) grep(x,as.character(modelsummary$itemId))))
     itempower<-modelsummary[-removerowsnum,"lowerbound"]
     itempowerId<-modelsummary[-removerowsnum,"itemId"]

@@ -20,7 +20,7 @@ getgames<-function(summonerids=NA,limit=50000) {
     previousmatches<-dbGetQuery(con,paste0("SELECT matchId FROM statmous_gamedata.games WHERE createDate >= '",patchdate,"';"))
     if(length(previousmatches)!=0) {previousmatches<-as.numeric(previousmatches[,1])}
     dbDisconnect(con)
-        
+    
     ##Rearrange summonerids so we pull them in random order
     ##And remove extra summonerids since we don't need to use quite so many
     ##The limit must be greater if we have a low number of days we are pulling in, since there are fewer matches for each summoner
@@ -35,9 +35,9 @@ getgames<-function(summonerids=NA,limit=50000) {
     c<-0
     while (nrow(games)/10<limit) {
         c<-c+1
-              
+        
         currentsummoner<-summonerids[c]
-                
+        
         ##Check if we ran out of summonerids due to not pulling enough in, if so end execution
         if(c>length(summonerids)) {
             print("Ending execution, ran out of summonerids")
@@ -54,7 +54,7 @@ getgames<-function(summonerids=NA,limit=50000) {
         ##Filter for only Ranked solo queue matches
         matches<-apidata$matches    
         matches<-matches[matches$queueType=="RANKED_SOLO_5x5",]
-            
+        
         ##Convert createDate to Date format
         fun <- function(x) as.Date(x/ 86400000, origin = "1970-01-01")
         matches$matchCreation<-sapply(matches$matchCreation,fun)
@@ -99,14 +99,20 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     
     ##Save participants and stats into data frames
     gamedata<-apidata$participants
-    stats<-apidata$participants$stats
+    stats<-apidata$participants$stats   
+    teamdata<-apidata$team
     
     ##only pulls in needed columns (adding summoner spells would be an easy extension to this)
     validcolumns <- c("participantId","teamId","championId")                      
     gamedata <- gamedata[validcolumns]  
     
+    ##Filter team for only needed columns
+    validcolumns <- c("teamId","towerKills","dragonKills","baronKills")
+    teamdata <- teamdata[validcolumns]
+    teamdata <- data.frame(sapply(teamdata,unlist))
+        
     ##Filter stats for only needed columns
-    validcolumns <- c("winner","goldEarned","kills","deaths","assists","item0","item1","item2","item3","item4","item5","item6")
+    validcolumns <- c("winner","champLevel","kills","deaths","assists","goldEarned","item0","item1","item2","item3","item4","item5","item6")
     stats <- stats[validcolumns]
     
     ##Checks if any columns are missing because of null values, if so, adds NULLs 
@@ -162,7 +168,7 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     totalgold<-sum(gamedata$goldEarned)
     ##Make a table with each team's gold as a percentage of the total gold
     teamgolds<-rbind(c(100,round(sum(gamedata[gamedata$teamId==100,"goldEarned"])/totalgold,4)),
-          c(200,round(sum(gamedata[gamedata$teamId==200,"goldEarned"])/totalgold,4)))
+                     c(200,round(sum(gamedata[gamedata$teamId==200,"goldEarned"])/totalgold,4)))
     ##Merge gamedata with the above table
     gamedata<-merge(gamedata,teamgolds,by.x="teamId",by.y=1)
     ##Set new column's name
@@ -178,18 +184,27 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     ##Add KDA for each player
     gamedata$KDA<-round((gamedata$kills+gamedata$assists)/(gamedata$deaths+1),4)
     
+    ##Unlist teamdata variables and add them for each team, towerKills, dragonKills, baronKills
+    gamedata<-merge(gamedata,teamdata,by="teamId")
+    
     ##Adds champion names to the table
     gamedata<-merge(gamedata,champtable,by.x="championId",by.y="champ_id")
     colnames(gamedata)[ncol(gamedata)]<-"championName"
     
+    gamedata$champLevelAvg<-mean(gamedata$champLevel)
+    gamedata$gameTowerKills<-sum(teamdata$towerKills)
+    gamedata$gameDragonKills<-sum(teamdata$dragonKills)
+    gamedata$gameBaronKills<-sum(teamdata$baronKills)
+    
     ##Resort the column names in the format that I Want. and put it back in order the way it was before the merge
     gamedata<-gamedata[c("summonerId","summonerName","matchId","matchDuration","createDate","participantId","teamId","championId","championName","winner",
-               "kills","deaths","assists","KDA","goldEarned","playerPercGold","teamPercGold","item0","item1","item2","item3","item4","item5","item6")]
+                         "champLevel","champLevelAvg","towerKills","gameTowerKills","dragonKills","gameDragonKills","baronKills","gameBaronKills",
+                         "kills","deaths","assists","KDA","goldEarned","playerPercGold","teamPercGold","item0","item1","item2","item3","item4","item5","item6")]
     gamedata<-gamedata[order(gamedata$participantId),]
     
     ##Set winner as binary numeric
     gamedata$winner<-as.numeric(gamedata$winner)
-        
+    
     return(gamedata)
 }
 
@@ -231,7 +246,7 @@ endfunction <- function(requesttype="NA",games) {
         ##Write csv file with just today's games that we got
         todaydt<-format(Sys.time(),"%m.%d.%y")
         write.csv(games,paste0("finalgames ",todaydt,".csv"),row.names=FALSE)  
-                
+        
         ##Output the number of games we saved and the final count on MasterFinalGames
         numgames<-nrow(games)/10
         outputmessage<-paste(numgames,"games added to MySQL database")
