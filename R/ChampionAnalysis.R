@@ -292,7 +292,7 @@ gamephaseitemsummary<-function(trainset,limitingvar="matchDuration") {
     finalsummary2<-rbind(head(finalsummary[finalsummary$gamePhase=="early",],10),
                          head(finalsummary[finalsummary$gamePhase=="mid",],10),
                          head(finalsummary[finalsummary$gamePhase=="late",],10))
-        
+    
     return(finalsummary2)    
 }
 

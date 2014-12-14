@@ -1,6 +1,7 @@
 ##Holds functions used by multiple scripts
 ##Set latest patch date below
-patchdate<<-as.Date("2014-11-20")
+#patchdate<<-as.Date("2014-11-20")
+patchdate<<-as.Date("2014-12-11")
 
 reconnectdb <- function(database) {
     ##Finds all open MySQL connections and disconnects them, to make sure we don't have several open
