@@ -11,7 +11,6 @@ createmodel <- function(champlist="ALL") {
         champtable<-champtablecreate()
         champlist<-unique(champtable$champ_name)
         champlist<-gsub("'","''",champlist)
-        champlist<-champlist[!grepl("Rek",champlist)] ##Remove Rek'Sai for now because we have no data for her yet
     }
     
     allchamps<-data.frame()
@@ -232,6 +231,8 @@ summarizerf<-function(model,trainset) {
     ##Add itempower to the modelsummary
     itempower<-data.frame("itempower"=itempower,"itemId"=itempowerId)
     modelsummary<-merge(modelsummary,itempower,by="itemId",all.x=TRUE)    
+    
+    modelsummary$itempower<-round(modelsummary$itempower,2)
     modelsummary<-modelsummary[order(-modelsummary$itempower),]
     
     return(modelsummary)
@@ -243,7 +244,7 @@ gamephaseitemsummary<-function(trainset,limitingvar="matchDuration") {
     library(randomForest)
     
     ##Create a subset of the training set for only games that were won in the early game and fit a randomForest
-    trainearly<-trainset[trainset[,limitingvar]<=quantile(trainset[,limitingvar],0.1),]  
+    trainearly<-trainset[trainset[,limitingvar]<=1500,]  
     fitearly<-randomForest(winner~.,data=trainearly)
     
     ##Output accuracy to show progress as we go, summarize the randomForest importance and find the best items from it
@@ -252,7 +253,7 @@ gamephaseitemsummary<-function(trainset,limitingvar="matchDuration") {
     summaryearly$gamePhase<-"early"
     
     ##Create a subset of the training set for only games that were won in the mid game and fit a randomForest
-    trainmid<-trainset[trainset[,limitingvar]>quantile(trainset[,limitingvar],0.1) & trainset[,limitingvar]<quantile(trainset[,limitingvar],0.9),]
+    trainmid<-trainset[trainset[,limitingvar]>1500 & trainset[,limitingvar]<2700,]
     fitmid<-randomForest(winner~.,data=trainmid)
     
     ##Output accuracy to show progress as we go, summarize the randomForest importance and find the best items from it
@@ -261,7 +262,7 @@ gamephaseitemsummary<-function(trainset,limitingvar="matchDuration") {
     summarymid$gamePhase<-"mid"
     
     ##Create a subset of the training set for only games that were won in the late game and fit a randomForest
-    trainlate<-trainset[trainset[,limitingvar]>=quantile(trainset[,limitingvar],0.9),]
+    trainlate<-trainset[trainset[,limitingvar]>=2700,]
     fitlate<-randomForest(winner~.,data=trainlate)
     
     ##Output accuracy to show progress as we go, summarize the randomForest importance and find the best items from it
@@ -273,14 +274,16 @@ gamephaseitemsummary<-function(trainset,limitingvar="matchDuration") {
     combinedsummary<-rbind(summaryearly,summarymid,summarylate)
     
     ##Loop through every unique item in our combined list, and find which gamePhase it is best in, then add that row, including its itempower, to the 
-    ##final data frame for output
+    ##final data frame for output - this is for removing duplicates
     finalsummary<-data.frame()
     curitems<-unique(combinedsummary$itemId)
     for(id in curitems) {
         cursummary<-combinedsummary[combinedsummary$itemId==id,]
         finalsummary<-rbind(finalsummary,cursummary[order(-cursummary$itempower),][1,])
     }
-    
+    #finalsummary<-combinedsummary     ##This is for use when we don't remove duplicates above
+
+
     ##Remove MeanDecreaseGini column since we don't need it and any non item rows    
     finalsummary<-subset(finalsummary,select=-c(MeanDecreaseGini))
     finalsummary<-subset(finalsummary,!is.na(finalsummary$itempower))

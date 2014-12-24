@@ -3,9 +3,13 @@
 #patchdate<<-as.Date("2014-11-20")
 patchdate<<-as.Date("2014-12-11")
 
+##Calls needed librarys for JSON conversion and SQL
+library(jsonlite)
+library(httr)   
+library(RMySQL) 
+
 reconnectdb <- function(database) {
     ##Finds all open MySQL connections and disconnects them, to make sure we don't have several open
-    library(RMySQL)
     list<-dbListConnections(MySQL())
     for(i in list) {dbDisconnect(i)}
     
@@ -67,16 +71,14 @@ itemtablecreate <- function() {
     
     colnames(itemtable) <- c("itemId","itemName")
     
+    ##Consider adding item?itemListData=all to the request above to get all the data, including gold cost and stats, you will need it later
+    
     return(itemtable)     
 }
 
 ##This function takes different request urls and queries the Riot API then sends the data back
 apiquery <- function(request,requesttype = NA,requestitem = 0) {
     ##Gets request code to paste into the API url
-    
-    ##Calls needed librarys for JSON conversion
-    library(jsonlite)
-    library(httr)    
     
     ##Sets up requesttypecount based on which type of request was sent
     if(requesttype=="games") {
