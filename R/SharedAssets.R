@@ -10,11 +10,11 @@ library(RMySQL)
 
 reconnectdb <- function(database) {
     ##Finds all open MySQL connections and disconnects them, to make sure we don't have several open
-    list<-dbListConnections(MySQL())
-    for(i in list) {dbDisconnect(i)}
+    list<-DBI::dbListConnections(MySQL())
+    for(i in list) {DBI::dbDisconnect(i)}
     
     ##Reconnects to the games database using username and password
-    con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password=dbpw,dbname=database))
+    con<-try(DBI::dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password=dbpw,dbname=database))
     
     attemptcount<-0
     while(class(con)=="try-error") {
@@ -22,7 +22,7 @@ reconnectdb <- function(database) {
         Sys.sleep(300)
         
         ##Try pulling again
-        con<-try(dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password=dbpw,dbname=database))
+        con<-try(DBI::dbConnect(MySQL(),host="siteground270.com",user="statmous_maxspar",password=dbpw,dbname=database))
         
         ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
         if(attemptcount==5 & class(con)=="try-error") {
@@ -77,22 +77,8 @@ itemtablecreate <- function() {
 }
 
 ##This function takes different request urls and queries the Riot API then sends the data back
-apiquery <- function(request,requesttype = NA,requestitem = 0) {
+apiquery <- function(request,requesttype = NA,objectcounter=0,dbtype="SQL") {
     ##Gets request code to paste into the API url
-    
-    ##Sets up requesttypecount based on which type of request was sent
-    if(requesttype=="games") {
-        requesttypecount<-NROW(requestitem)/10
-    } else if (requesttype=="finalgames") {
-        requesttypecount<-NROW(requestitem)/10
-    } else if (requesttype=="summonerids") {
-        requesttypecount<-NROW(requestitem)
-    } else if (requesttype=="champions") {
-        requesttypecount<-NROW(requestitem)
-    } else {
-        requesttype<-"NA"
-        requesttypecount<-NROW(requestitem)
-    }    
     
     ##Need to setup rate limit 500 req in 10 minutes, 10 req every 10 seconds, 8 requests per 10 seconds is conservative
     if(!exists("requestcount")) {requestcount <<- vector()}
@@ -104,32 +90,47 @@ apiquery <- function(request,requesttype = NA,requestitem = 0) {
     numofrequests<-length(requestcount)
     if(numofrequests >= requestlimit) {
         if(requestcount[numofrequests-(requestlimit-1)]>(Sys.time()-timelimit)) {
-            pauseforratelimit(timelimit,requesttypecount,requesttype)
+            pauseforratelimit(timelimit,objectcounter,requesttype)
         }
     }
     
     ##Sets up code for requests and creates url for api
-    apikey <- "0fb38d6c-f520-481e-ad6d-7ae773f90869"
-    baseurl <- "https://na.api.pvp.net"
-    endurl <- paste("?api_key=",apikey,sep="")
-    apiurl <- paste(baseurl,request,endurl,sep="")
+    apikey<-"0fb38d6c-f520-481e-ad6d-7ae773f90869"
+    baseurl<-"https://na.api.pvp.net"
+    if(grepl("[?]",request)) {
+        endurl<-paste0("&api_key=",apikey)
+    } else {
+        endurl<-paste0("?api_key=",apikey)        
+    }
+    apiurl<-paste0(baseurl,request,endurl)
     
     ##Sends url to api and retrieves the data. This function checks for errors first
-    data<-tryget(apiurl,requesttype,requestitem)
+    data<-tryget(apiurl,requesttype,objectcounter)
     
     ##In case we pull in a different error code from the API, try again up to 5 times before giving up
     k=0
     while(data$status_code!=200) {
         ##Output error messaging
-        print(paste0("Hit an error pulling API data; status code ",data$status_code,"; will retry"))
         
         ##If we hit the rate limit status code, pause before retrying
         if(data$status_code==429) {
-            pauseforratelimit(timelimit,requesttypecount,requesttype)
+            print(paste0("Hit an error pulling API data; status code ",data$status_code,"; will pause for rate limit and retry"))
+            pauseforratelimit(timelimit,objectcounter,requesttype)
+        }
+        
+        if(data$status_code %in% c(400,401,403,404)) {
+            print(paste0("Hit an error pulling API data; status code ",data$status_code,"; skipping this entry"))
+            break
+        }
+        
+        if(data$status_code %in% c(500,503)) {
+            print(paste0("Hit an error pulling API data; status code ",data$status_code,"; waiting 5 minutes for server before retrying"))
+            attemptcount<-0
+            data<-waitforserver(apiurl,data,requesttype,objectcounter,attemptcount)            
         }
         
         ##Try pulling data again
-        data<-tryget(apiurl,requesttype,requestitem)
+        data<-tryget(apiurl,requesttype,objectcounter)
         
         ##If we get an error 2 times, give up
         k=k+1
@@ -143,11 +144,15 @@ apiquery <- function(request,requesttype = NA,requestitem = 0) {
     ##Otherwise send back NA. Data can be empty if summonerId has no ranked games
     if(data$status_code==200 & length(content(data))!=0) {
         ##Convert API data to correct JSON format
-        json1 <- content(data)     
-        json2 <- jsonlite::fromJSON(toJSON(json1))
+        json1 <- toJSON(content(data))
+        json2 <- jsonlite::fromJSON(json1)
         
         ##This is the data from the api sent back to other scripts
-        apidata <- json2
+        if(dbtype=="SQL") {            
+            apidata<-json2
+        } else if(dbtype=="Mongo") {
+            apidata<-json1
+        }
     } else {
         apidata <- NA
     }    
@@ -161,26 +166,14 @@ apiquery <- function(request,requesttype = NA,requestitem = 0) {
     return(apidata)
 }
 
-tryget<-function(apiurl,requesttype,requestitem) {
+tryget<-function(apiurl,requesttype,objectcounter) {
     ##Called by apiquery to check if we can connect to the server. If we get an error using GET 
     ##it will wait some time then try again
     data<-try(GET(apiurl))
     
     attemptcount<-0
     while(class(data)=="try-error") {
-        print(paste("Could not connect to API server. It has been",(attemptcount*5),"minutes without connection. Waiting 5 minutes then trying again."))
-        Sys.sleep(300)
-        
-        ##Try pulling again
-        data<-try(GET(apiurl))
-        
-        ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
-        if(attemptcount==5 & class(data)=="try-error") {
-            print("After retrying for 30 minutes, could not connect to server, ending execution")
-            stop(endfunction(requesttype,games))
-        }
-        
-        attemptcount<-attemptcount+1
+        data<-waitforserver(data,requesttype,objectcounter,attemptcount)
     }
     
     ##Add the current time to the request count vector
@@ -188,4 +181,27 @@ tryget<-function(apiurl,requesttype,requestitem) {
     requestcount<<-requestcount    
     
     return(data)
+}
+
+waitforserver<-function(apiurl,data,requesttype,objectcounter,attemptcount) {
+    print(paste("Could not connect to API server. It has been",(attemptcount*5),"minutes without connection. Waiting 5 minutes then trying again."))
+    Sys.sleep(300)
+    
+    ##Try pulling again
+    data<-try(GET(apiurl))
+    
+    ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
+    if(attemptcount==5 & class(data)=="try-error") {
+        print("After retrying for 30 minutes, could not connect to server, ending execution")
+        stop(endfunction(requesttype,objectcounter))
+    }
+    
+    attemptcount<-attemptcount+1
+    return(data)
+}
+
+pauseforratelimit<-function(timelimit,objectcounter,requesttype) {
+    ##Pauses execution of apiquery function until time has passed for the ratelimit to subside
+    print(sprintf("pause %g seconds for rate limit, currently have %g %s",timelimit,objectcounter,requesttype))
+    Sys.sleep(timelimit)    
 }

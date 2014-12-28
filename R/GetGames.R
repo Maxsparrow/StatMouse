@@ -90,7 +90,7 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     ##Takes a match Id and pulls the game info for it
     
     ##Use matchId to pull the game info
-    request <- paste("/api/lol/na/v2.2/match/",matchId,sep="")
+    request <- paste0("/api/lol/na/v2.2/match/",matchId)
     apidata<-apiquery(request,requesttype,requestitem)
     
     ##If the data pulled back by the request is bad, create an all 0s matrix
@@ -208,12 +208,6 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     return(gamedata)
 }
 
-pauseforratelimit<-function(timelimit,requesttypecount,requesttype) {
-    ##Pauses execution of apiquery function until time has passed for the ratelimit to subside
-    print(sprintf("pause %d seconds for rate limit, currently have %d %s",timelimit,requesttypecount,requesttype))
-    Sys.sleep(timelimit)    
-}
-
 addtodb <- function(gamedata) {
     ##Adds the current gamedata to the MySQL database
     
@@ -239,17 +233,11 @@ addtodb <- function(gamedata) {
     return(result)    
 }
 
-endfunction <- function(requesttype="NA",games) {
+endfunction <- function(requesttype="NA",objectcounter) {
     ##Ends the function execution after hitting the limit or losing internet connection for 30 minutes
     ##Only save to csv if this function is called with the games variable. Otherwise output an error
     if(requesttype=="games") {
-        ##Write csv file with just today's games that we got
-        todaydt<-format(Sys.time(),"%m.%d.%y")
-        write.csv(games,paste0("finalgames ",todaydt,".csv"),row.names=FALSE)  
-        
-        ##Output the number of games we saved and the final count on MasterFinalGames
-        numgames<-nrow(games)/10
-        outputmessage<-paste(numgames,"games added to MySQL database")
+        outputmessage<-paste(objectcounter,"games added to MySQL database")
         return(outputmessage)
     } else {
         stop("Error: Endtype is not games")
