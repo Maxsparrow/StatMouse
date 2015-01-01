@@ -1,12 +1,15 @@
 findsummonerids2 <- function(summonerids,limit = 100000) {
     ##Finds a large number of summonerids and saves them to a csv file so that we can use them in the future
     
-    ##converts summonerids to data frame if not already
+    ##converts summonerids to character if not already
     if(class(summonerids)=="data.frame") {
-        summonerids<-as.vector(summonerids[,1])
+        summonerids<-as.character(summonerids[,1])
     } else if (class(summonerids)=="list") {
-        summonerids<-unlist(summonerids)
+        summonerids<-as.character(unlist(summonerids))
     }
+    
+    ##Set limit to the amount requested plus the amount already passed in, so we get 100,000 more by default
+    limit = limit + length(summonerids)
     
     ##loops until it reaches at least the desired # of summoner ids
     counter<-1
@@ -22,7 +25,7 @@ findsummonerids2 <- function(summonerids,limit = 100000) {
         
         ##pulls recent games and finds summonerids
         request <- paste("/api/lol/na/v1.3/game/by-summoner/",cursummoner,"/recent",sep="")
-        apidata<-apiquery(request,"summonerids",summonerids)
+        apidata<-apiquery(request,"summonerids",length(summonerids))
         if(is.na(apidata[1])) {next}
         
         ##Finds other players and adds them to a dataframe
@@ -31,9 +34,12 @@ findsummonerids2 <- function(summonerids,limit = 100000) {
             tempids <- c(tempids,unlist(fellowPlayers[[i]][,1]))
         }
         
+        ##Removes summoner ids we already got before
+        tempids<-tempids[!tempids %in% summonerids]
+        
         ##Adds the new players to the main list of summoner ids
-        summonerids <- c(summonerids,tempids)        
-        summonerids <- unique(summonerids)
+        summonerids<-c(summonerids,tempids)        
+        summonerids<-unique(summonerids)
         
         counter<-counter+1
         
@@ -46,4 +52,6 @@ findsummonerids2 <- function(summonerids,limit = 100000) {
     filelist<-list.files()
     cnt<-length(grep("summonerids",filelist))+1
     write.csv(summonerids,paste0("summonerids ",cnt,".csv"),row.names=FALSE)
+    
+    return(summonerids)
 }

@@ -108,7 +108,7 @@ apiquery <- function(request,requesttype = NA,objectcounter=0,dbtype="SQL") {
     data<-tryget(apiurl,requesttype,objectcounter)
     
     ##In case we pull in a different error code from the API, try again up to 5 times before giving up
-    k=0
+    attemptcount<-0
     while(data$status_code!=200) {
         ##Output error messaging
         
@@ -125,19 +125,11 @@ apiquery <- function(request,requesttype = NA,objectcounter=0,dbtype="SQL") {
         
         if(data$status_code %in% c(500,503)) {
             print(paste0("Hit an error pulling API data; status code ",data$status_code,"; waiting 5 minutes for server before retrying"))
-            attemptcount<-0
-            data<-waitforserver(apiurl,data,requesttype,objectcounter,attemptcount)            
+            data<-waitforserver(apiurl,data,requesttype,objectcounter,attemptcount)
         }
         
         ##Try pulling data again
         data<-tryget(apiurl,requesttype,objectcounter)
-        
-        ##If we get an error 2 times, give up
-        k=k+1
-        if(k==2) {
-            print(paste("After",k,"attempts to retry api pull, skipping this entry"))
-            break
-        }        
     }
     
     ##Only try to convert data if it is a valid pull - must be status code 200 and contain data 
@@ -174,6 +166,7 @@ tryget<-function(apiurl,requesttype,objectcounter) {
     attemptcount<-0
     while(class(data)=="try-error") {
         data<-waitforserver(data,requesttype,objectcounter,attemptcount)
+        data<-try(GET(apiurl))
     }
     
     ##Add the current time to the request count vector
@@ -187,17 +180,11 @@ waitforserver<-function(apiurl,data,requesttype,objectcounter,attemptcount) {
     print(paste("Could not connect to API server. It has been",(attemptcount*5),"minutes without connection. Waiting 5 minutes then trying again."))
     Sys.sleep(300)
     
-    ##Try pulling again
-    data<-try(GET(apiurl))
-    
     ##If we try 5 times (30 minutes) and we still have no response, end execution of the program
     if(attemptcount==5 & class(data)=="try-error") {
         print("After retrying for 30 minutes, could not connect to server, ending execution")
         stop(endfunction(requesttype,objectcounter))
-    }
-    
-    attemptcount<-attemptcount+1
-    return(data)
+    } else if (class(data)!="try-error") return(data)
 }
 
 pauseforratelimit<-function(timelimit,objectcounter,requesttype) {
