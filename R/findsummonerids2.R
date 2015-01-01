@@ -1,4 +1,4 @@
-findsummonerids2 <- function(summonerids,limit = 100000) {
+findsummonerids2 <- function(limit = 100000) {
     ##Finds a large number of summonerids and saves them to a csv file so that we can use them in the future
     
     ##Get current summonerids from server
