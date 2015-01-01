@@ -1,13 +1,13 @@
 findsummonerids2 <- function(summonerids,limit = 100000) {
     ##Finds a large number of summonerids and saves them to a csv file so that we can use them in the future
     
-    ##converts summonerids to character if not already
-    if(class(summonerids)=="data.frame") {
-        summonerids<-as.character(summonerids[,1])
-    } else if (class(summonerids)=="list") {
-        summonerids<-as.character(unlist(summonerids))
-    }
+    ##Get current summonerids from server
+    con<-reconnectdb("statmous_gamedata")    
+    summonerids<-dbGetQuery(con,"SELECT summonerId FROM summoners;")
+    dbDisconnect(con)
     
+    summonerids<-as.character(summonerids[,1])
+        
     ##Set limit to the amount requested plus the amount already passed in, so we get 100,000 more by default
     limit = limit + length(summonerids)
     
@@ -21,7 +21,7 @@ findsummonerids2 <- function(summonerids,limit = 100000) {
         }
         
         ##prepares tempid variable for later
-        tempids <- vector()
+        newids <- vector()
         
         ##pulls recent games and finds summonerids
         request <- paste("/api/lol/na/v1.3/game/by-summoner/",cursummoner,"/recent",sep="")
@@ -31,15 +31,21 @@ findsummonerids2 <- function(summonerids,limit = 100000) {
         ##Finds other players and adds them to a dataframe
         fellowPlayers <- apidata$games$fellowPlayers
         for (i in 1:length(fellowPlayers)) {
-            tempids <- c(tempids,unlist(fellowPlayers[[i]][,1]))
+            newids <- c(newids,unlist(fellowPlayers[[i]][,1]))
         }
         
         ##Removes summoner ids we already got before
-        tempids<-tempids[!tempids %in% summonerids]
+        newids<-newids[!newids %in% summonerids]     
         
-        ##Adds the new players to the main list of summoner ids
-        summonerids<-c(summonerids,tempids)        
-        summonerids<-unique(summonerids)
+        ##Add to current list of all summonerids
+        summonerids<-c(summonerids,newids)
+        
+        ##If there are new ids to add, convert them to a data frame and add them to the database
+        if(length(newids)!=0) {        
+            newids<-data.frame(newids)
+            colnames(newids)<-"summonerId"
+            result<-addtodb(newids,"summoners")
+        }
         
         counter<-counter+1
         
@@ -48,10 +54,6 @@ findsummonerids2 <- function(summonerids,limit = 100000) {
             break
         }
     }
-    
-    filelist<-list.files()
-    cnt<-length(grep("summonerids",filelist))+1
-    write.csv(summonerids,paste0("summonerids ",cnt,".csv"),row.names=FALSE)
     
     return(summonerids)
 }

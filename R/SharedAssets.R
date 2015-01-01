@@ -192,3 +192,27 @@ pauseforratelimit<-function(timelimit,objectcounter,requesttype) {
     print(sprintf("pause %g seconds for rate limit, currently have %g %s",timelimit,objectcounter,requesttype))
     Sys.sleep(timelimit)    
 }
+
+addtodb <- function(datatoadd,table) {
+    ##Adds new gamedata or summonerids to the MySQL database
+    result<-FALSE
+    trycount<-0
+    while(result!=TRUE) { 
+        con<-reconnectdb("statmous_gamedata")
+        result<-try(dbWriteTable(con,table,datatoadd,append=TRUE,row.names=FALSE))
+        
+        trycount<-trycount+1
+        if(result!=TRUE & trycount<5) {
+            print("Write failed, trying again after 5 minutes")
+            Sys.sleep(300)
+        } else if(result!=TRUE & trycount==5) {
+            print("After 5 attempts, skipping this entry")
+            break
+        } else {
+            print("Successfully wrote data to database")
+        }                
+    }
+    
+    dbDisconnect(con)
+    return(result)    
+}

@@ -76,7 +76,7 @@ getgames<-function(summonerids=NA,limit=50000) {
             gamedata<-creategamedata2(matchIds[j],"games",games,champtable)
             if(gamedata[1,2]==0) {next} ##Conditional that allows for skipping games on errors
             
-            result<-addtodb(gamedata)
+            result<-addtodb(gamedata,"games")
             
             ##Add gamedata to the main games data frame
             games<-rbind(games,gamedata)
@@ -206,31 +206,6 @@ creategamedata2 <- function(matchId,requesttype,requestitem,champtable) {
     gamedata$winner<-as.numeric(gamedata$winner)
     
     return(gamedata)
-}
-
-addtodb <- function(gamedata) {
-    ##Adds the current gamedata to the MySQL database
-    
-    result<-FALSE
-    trycount<-0
-    while(result!=TRUE) { 
-        con<-reconnectdb("statmous_gamedata")
-        result<-try(dbWriteTable(con,'games',gamedata,append=TRUE,row.names=FALSE))
-        
-        trycount<-trycount+1
-        if(result!=TRUE & trycount<5) {
-            print("Write failed, trying again after 5 minutes")
-            Sys.sleep(300)
-        } else if(result!=TRUE & trycount==5) {
-            print("After 5 attempts, skipping this entry")
-            break
-        } else {
-            print("Successfully wrote game to database")
-        }                
-    }
-    
-    dbDisconnect(con)
-    return(result)    
 }
 
 endfunction <- function(requesttype="NA",objectcounter) {
