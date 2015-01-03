@@ -7,8 +7,10 @@ findsummonerids2 <- function(limit = 100000) {
     summonerids<-dbGetQuery(con,"SELECT summonerId FROM summoners;")
     dbDisconnect(con)
     
+    ##Set summonerids as a vector, then reorganize it so we pull different ids each time we run
     summonerids<-as.character(summonerids[,1])
-        
+    summonerids<-sample(summonerids,length(summonerids),replace=F)
+    
     ##Set limit to the amount requested plus the amount already passed in, so we get 100,000 more by default
     limit = limit + length(summonerids)
     
