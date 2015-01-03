@@ -189,7 +189,7 @@ waitforserver<-function(apiurl,data,requesttype,objectcounter,attemptcount) {
 
 pauseforratelimit<-function(timelimit,objectcounter,requesttype) {
     ##Pauses execution of apiquery function until time has passed for the ratelimit to subside
-    print(sprintf("pause %g seconds for rate limit, currently have %g %s",timelimit,objectcounter,requesttype))
+    print(sprintf("pause %g seconds for rate limit, currently have %s %s",timelimit,objectcounter,requesttype))
     Sys.sleep(timelimit)    
 }
 
@@ -209,7 +209,7 @@ addtodb <- function(datatoadd,table) {
             print("After 5 attempts, skipping this entry")
             break
         } else {
-            print("Successfully wrote data to database")
+            print(sprintf("Successfully wrote %s record(s) to the %s database",NROW(datatoadd),table))
         }                
     }
     

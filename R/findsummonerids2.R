@@ -1,5 +1,6 @@
 findsummonerids2 <- function(limit = 100000) {
     ##Finds a large number of summonerids and saves them to a csv file so that we can use them in the future
+    source('~/StatMouse/R/SharedAssets.R')
     
     ##Get current summonerids from server
     con<-reconnectdb("statmous_gamedata")    
@@ -55,5 +56,5 @@ findsummonerids2 <- function(limit = 100000) {
         }
     }
     
-    return(summonerids)
+    print(sprintf("Execution completed, there are now %s summonerIds in the database",length(summonerids)))
 }
