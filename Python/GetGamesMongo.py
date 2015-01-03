@@ -1,25 +1,17 @@
-import mysql.connector
+import pymysql
 import random
 from Connections import *
 
 def getsummonerids(amount=10):
 
-    attemptcount = 0
-    while attemptcount <= 5:
-        try:
-            sdb = mysql.connector.connect(host=SQLhost,user=SQLuser,passwd=SQLpass,db="statmous_gamedata")
-            cursor = sdb.cursor()
+    sdb = pymysql.connect(host=SQLhost,user=SQLuser,passwd=SQLpass,db="statmous_gamedata")
+    cursor = sdb.cursor()
 
-            query = ("SELECT summonerId FROM summoners LIMIT 10000")
+    query = ("SELECT summonerId FROM summoners")
 
-            cursor.execute(query)
+    cursor.execute(query)
 
-            results = cursor.fetchall()
-            break
-        except mysql.connector.Error as errorno:
-            attemptcount += 1
-            sdb.close()
-            print errorno
+    results = cursor.fetchall()
 
     summonerids = []
 
@@ -34,8 +26,20 @@ def getsummonerids(amount=10):
 
     return summonerids
 
-print getsummonerids()
+def apirequest(requesttype,summonerid=NA):
+    url = {
+        'matchhistory'
+        
+    
+
+def getgames(amount=10):
+    return False
+
+summonerids = getsummonerids()
+
 
 
 #from pymongo import MongoClient
 #mdb = MongoClient()
+
+
