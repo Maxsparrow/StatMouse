@@ -1,5 +1,6 @@
 findsummonerids2 <- function(limit = 100000) {
     ##Finds a large number of summonerids and saves them to a csv file so that we can use them in the future
+    ##On 1/3/15 took 8687 seconds (2.41 hours) for 100,000 summoner ids, avg 0.087 seconds per id
     source('~/StatMouse/R/SharedAssets.R')
     
     ##Get current summonerids from server
