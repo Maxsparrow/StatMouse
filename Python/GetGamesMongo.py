@@ -176,8 +176,8 @@ def getgamesmongo(amount):
             
 ##TODO make match and matchhistory classes inheriting from apirequest?
 ##Also consider making this function and the one above
-amount = argv        
-        
-getgamesmongo(amount)
+script, amount = argv
+
+getgamesmongo(int(amount))
 
 
