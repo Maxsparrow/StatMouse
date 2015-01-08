@@ -19,7 +19,7 @@ class summoners(object):
     def __repr__(self):
         return str(self.ids)
 
-    def getids(self,amount):
+    def setids(self,amount):
         """Fetches a certain number of ids from MySQL server and adds them to the ids list"""
         scon = pymysql.connect(host=SQLhost,user=SQLuser,passwd=SQLpass,db="statmous_gamedata")
         cursor = scon.cursor()
@@ -42,7 +42,11 @@ class summoners(object):
         random.shuffle(summonerids)
         for summonerid in summonerids[0:amount]:
             self.ids.append(summonerid)
-
+			
+	def getid(self):
+		"""Pulls from the list of summoner ids we created one at a time"""
+		for id in self.ids:
+			yield id
 
 class apirequest(object):
     #Example URL:
@@ -56,6 +60,7 @@ class apirequest(object):
     def __init__(self,requesttype,**args):
         """Valid requesttypes are: matchhistory,match,items,champions
         Make sure to declare named variables that are needed like summonerId or matchId"""
+		self.data = None
         self.requesttype=requesttype
         
         if requesttype == "matchhistory":
@@ -68,23 +73,41 @@ class apirequest(object):
             self.url = self.urlbase + self.region+'/v2.2/match/'+str(args['matchId'])+self.apikey+incTlStr                        
     
     def __repr__(self):
+		if self.data != None:
+			return str(self.data)
         return self.url
     
     def sendrequest(self):
         """Sends a request to the server based on init above"""
-        f = urllib.urlopen(self.url)
-        jsondata = f.read()
-        apidata = json.loads(jsondata)
-        self.data = apidata
-        
+        attemptcount = 0
+		while attemptcount <= 5:
+			try:		
+				f = urllib.urlopen(self.url)
+				jsondata = f.read()
+				apidata = json.loads(jsondata)
+				self.data = apidata
+				break
+			except:
+				attemptcount += 1
+				print 'Could not retrieve apidata, waiting one minute then retrying'
+				time.sleep(60)
+				if attemptcount == 5:
+					print 'Not able to retrieve apidata, returning None value'
+					self.data = None
     
-class match(object):
-    def __init__(self,matchdata):
-        """Initialize with matchdata sent from apirequest"""
-        self.data = matchdata
-        
-    def __repr__(self):
-        return str(self.data)
+class matchhistory(apirequest):
+	def __init__(self,summonerId):
+		self.url = apirequest.urlbase + apirequest.region+'/v2.2/matchhistory/'+str(summonerId)+apirequest.apikey
+		
+	def getmatchId(self):
+	"""Generator to return matchIds one at a time"""
+		for match in self.data['matches']:
+			yield match['matchId']
+	
+class match(apirequest):
+    def __init__(self,matchId,includeTimeline=False):
+        """Initialize with url to get matchdata"""
+		self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(matchId)+apirequest.apikey+str(includeTimeline)  
         
     def addcustomstats(self):
         """Adds custom fields to the match data for participants,teams, and the main frames"""
