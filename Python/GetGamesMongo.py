@@ -6,20 +6,23 @@ import pymongo
 import datetime
 import time
 from sys import argv
-from Connections import *
+#from Connections import *
 
 patchdate = datetime.date(2014,12,11)
 
 class summoners(object):
-    def __init__(self,amount):
+    def __init__(self):
         """Initialize list for summoner ids"""
         self.ids = []
-        self.getids(amount)
+        self.ids_used = 0
+        self.setids()
     
     def __repr__(self):
-        return str(self.ids)
+        print len(self.ids)+' Summoner Ids'
+        print 'Next 10 summoner ids:'
+        return str(self.ids[self.ids_used:self.ids_used+10])
 
-    def setids(self,amount):
+    def setids(self):
         """Fetches a certain number of ids from MySQL server and adds them to the ids list"""
         scon = pymysql.connect(host=SQLhost,user=SQLuser,passwd=SQLpass,db="statmous_gamedata")
         cursor = scon.cursor()
@@ -33,20 +36,24 @@ class summoners(object):
         summonerids = []
 
         for summonerid in results:
-            summonerids.append(summonerid[0])
+            self.ids.append(summonerid[0])
 
         cursor.close()
         scon.close()
         
         ##Randomly sort the summoner ids and add the desired amount to the list
-        random.shuffle(summonerids)
-        for summonerid in summonerids[0:amount]:
-            self.ids.append(summonerid)
-			
-	def getid(self):
-		"""Pulls from the list of summoner ids we created one at a time"""
-		for id in self.ids:
-			yield id
+        random.shuffle(self.ids)
+        
+    def getid(self):
+        """Pulls from the list of summoner ids we created one at a time"""
+        self.ids_used+=1 
+        try:
+            return self.ids[self.ids_used-1]
+        except:
+            raise IndexError('Ran out of summonerids, use reset_ids_used to reset counter')
+        
+    def reset_ids_used(self):
+        self.ids_used=0
 
 class apirequest(object):
     #Example URL:
@@ -60,58 +67,60 @@ class apirequest(object):
     def __init__(self,requesttype,**args):
         """Valid requesttypes are: matchhistory,match,items,champions
         Make sure to declare named variables that are needed like summonerId or matchId"""
-		self.data = None
+        self.data = None
         self.requesttype=requesttype
-        
+
         if requesttype == "matchhistory":
             self.url = self.urlbase + self.region+'/v2.2/matchhistory/'+str(args['summonerId'])+self.apikey
-        elif requesttype == "match":
+        elif requesttype == "match":            
             if 'includeTimeline' in args:
                 incTlStr = '&includeTimeline='+str(args['includeTimeline'])
             else:
                 incTlStr = ''
             self.url = self.urlbase + self.region+'/v2.2/match/'+str(args['matchId'])+self.apikey+incTlStr                        
-    
+
     def __repr__(self):
-		if self.data != None:
-			return str(self.data)
-        return self.url
-    
+        if self.data != None:
+            return str(self.data)
+        else:
+            return self.url
+
     def sendrequest(self):
         """Sends a request to the server based on init above"""
         attemptcount = 0
-		while attemptcount <= 5:
-			try:		
-				f = urllib.urlopen(self.url)
-				jsondata = f.read()
-				apidata = json.loads(jsondata)
-				self.data = apidata
-				break
-			except:
-				attemptcount += 1
-				print 'Could not retrieve apidata, waiting one minute then retrying'
-				time.sleep(60)
-				if attemptcount == 5:
-					print 'Not able to retrieve apidata, returning None value'
-					self.data = None
+        while attemptcount <= 5:
+            try:		
+                f = urllib.urlopen(self.url)
+                jsondata = f.read()
+                apidata = json.loads(jsondata)
+                self.data = apidata
+                break
+            except:
+                attemptcount += 1
+                print 'Could not retrieve apidata, waiting one minute then retrying'
+                time.sleep(60)
+                if attemptcount == 5:
+                    print 'Not able to retrieve apidata, returning None value'
+                    self.data = None
     
 class matchhistory(apirequest):
-	def __init__(self,summonerId):
-		self.url = apirequest.urlbase + apirequest.region+'/v2.2/matchhistory/'+str(summonerId)+apirequest.apikey
-		
-	def getmatchId(self):
-	"""Generator to return matchIds one at a time"""
-		for match in self.data['matches']:
-			yield match['matchId']
+    def __init__(self,summonerId):
+        self.url = apirequest.urlbase + apirequest.region+'/v2.2/matchhistory/'+str(summonerId)+apirequest.apikey
+        self.data = None
+
+    def getmatchId(self):
+        """Generator to return matchIds one at a time"""
+        for match in self.data['matches']:
+            yield match['matchId']
 	
 class match(apirequest):
     def __init__(self,matchId,includeTimeline=False):
         """Initialize with url to get matchdata"""
-		self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(matchId)+apirequest.apikey+str(includeTimeline)  
-        
+        self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)  
+
     def addcustomstats(self):
         """Adds custom fields to the match data for participants,teams, and the main frames"""
-        
+
         ##Find total gold for each team and the whole match
         team100Gold = 0
         team200Gold = 0
@@ -122,7 +131,7 @@ class match(apirequest):
                 team100Gold += participant['stats']['goldEarned']
             elif participant['teamId'] == 200:
                 team200Gold += participant['stats']['goldEarned']
-            
+
         ##Adds custom fields to teams frame
         gameTowerKills = 0
         for team in self.data['teams']:
@@ -131,22 +140,22 @@ class match(apirequest):
                 team['goldEarned'] = team100Gold
             elif team['teamId'] == 200:
                 team['goldEarned'] = team200Gold        
-            team['goldEarnedPercentage'] = round(float(team['goldEarned'])/totalGameGold,6)
-        
+                team['goldEarnedPercentage'] = round(float(team['goldEarned'])/totalGameGold,6)
+
         ##Adds custom fields to the participants frames
         for participant in self.data['participants']:
             participant['stats']['goldEarnedPercentage'] = round(float(participant['stats']['goldEarned'])/totalGameGold,6)
             participant['stats']['KDA'] = round(float(participant['stats']['kills']+participant['stats']['assists'])/(participant['stats']['deaths']+1),6)
-                      
+
         ##Adds custom fields to the main frame
         self.data['stats'] = {'goldEarned':totalGameGold,'towerKills':gameTowerKills}
-            
+
     def addtomongo(self):
         """Adds current matchdata to mongodb database; run after adding custom stats above"""
         mcon = pymongo.MongoClient('localhost',27017)
         mdb = mcon.games
         gamescoll = mdb.games
-        
+
         ##Check if matchId already exists, if not, add to db and disconnect
         mcursor = gamescoll.find({'matchId':self.data['matchId']})
         counter = 0         
@@ -160,11 +169,10 @@ class match(apirequest):
 def getmatchIds(amount = 1000):
     cursummoners = summoners(int(amount/2))
     matchIds = []
-    counter = 0
     reqcounter = 0
     while len(matchIds) < amount:
-        matchhistory = apirequest('matchhistory',summonerId=cursummoners.ids[counter])
-        matchhistory.sendrequest()
+        m1 = matchhistory(cursummoners.getid())
+        m1.sendrequest()
         reqcounter += 1
         if reqcounter == 8:
             print 'hit rate limit waiting 10 seconds'
@@ -174,10 +182,6 @@ def getmatchIds(amount = 1000):
             for match in matchhistory.data['matches']:
                 if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate:
                     matchIds.append(match['matchId'])
-        counter += 1
-        if counter >= len(cursummoners.ids):
-            cursummoners.getids(int(amount/2))
-            print 'added %d more summonerids to summonerid list' % int(amount/2)
             
     return matchIds
     
@@ -199,8 +203,8 @@ def getgamesmongo(amount):
             
 ##TODO make match and matchhistory classes inheriting from apirequest?
 ##Also consider making this function and the one above
-script, amount = argv
+#script, amount = argv
 
-getgamesmongo(int(amount))
+#getgamesmongo(int(amount))
 
 
