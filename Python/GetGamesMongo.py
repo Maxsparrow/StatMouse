@@ -5,6 +5,7 @@ import json
 import pymongo
 import datetime
 import time
+import re
 from sys import argv
 #from Connections import *
 
@@ -57,27 +58,22 @@ class summoners(object):
 
 class apirequest(object):
     #Example URL:
-    #https://na.api.pvp.net/api/lol/na/v2.2/matchhistory/102935?api_key=0fb38d6c-f520-481e-ad6d-7ae773f90869
+    #http://na.api.pvp.net/api/lol/na/v2.2/matchhistory/102935?api_key=0fb38d6c-f520-481e-ad6d-7ae773f90869
     urlbase = 'http://na.api.pvp.net/api/lol/'
     region = 'na'
     apikey = '?api_key=0fb38d6c-f520-481e-ad6d-7ae773f90869'
     ##TODO: add functionality to track requests to prevent hitting rate limit, and response codes
     requesttracker = []
 
-    def __init__(self,requesttype,**args):
-        """Valid requesttypes are: matchhistory,match,items,champions
-        Make sure to declare named variables that are needed like summonerId or matchId"""
+    def __init__(self,url):
+        """Sets a url to use for a request. Must be done manually if not using predefined subclasses"""
         self.data = None
-        self.requesttype=requesttype
-
-        if requesttype == "matchhistory":
-            self.url = self.urlbase + self.region+'/v2.2/matchhistory/'+str(args['summonerId'])+self.apikey
-        elif requesttype == "match":            
-            if 'includeTimeline' in args:
-                incTlStr = '&includeTimeline='+str(args['includeTimeline'])
-            else:
-                incTlStr = ''
-            self.url = self.urlbase + self.region+'/v2.2/match/'+str(args['matchId'])+self.apikey+incTlStr                        
+        self.errorcounter = 0
+        
+        if re.search('\?',url):
+            self.url = url
+        else:
+            self.url = url + apikey                 
 
     def __repr__(self):
         if self.data != None:
@@ -102,6 +98,27 @@ class apirequest(object):
                 if attemptcount == 5:
                     print 'Not able to retrieve apidata, returning None value'
                     self.data = None
+        ##Check the status of the data returned for error codes:
+        if 'status' in self.data and self.data['status']['status_code']!=200:
+            self.statuscheck()
+        else:
+            self.errorcounter = 0
+                    
+    def statuscheck(self):
+        statuscode = self.data['status']['status_code']
+        if statuscode == 429:
+            print 'Rate limit exceeded, pausing 10 seconds and trying again'
+            self.errorcounter += 1
+            time.sleep(10)
+            self.sendrequest()
+        elif statuscode == 503 or statuscode == 500:
+            print 'API service unavailable, waiting 5 minutes and trying again'
+            self.errorcounter += 1
+            time.sleep(300)
+            self.sendrequest()
+        elif statuscode == 400 or statuscode == 401 or statuscode == 404:
+            print 'Request error, returning None value'
+            self.data = None
     
 class matchhistory(apirequest):
     def __init__(self,summonerId):
@@ -110,6 +127,8 @@ class matchhistory(apirequest):
 
     def getmatchId(self):
         """Generator to return matchIds one at a time"""
+        if 'matches' not in self.data['matches']:
+            raise IndexError('No matches available for this summoner')
         for match in self.data['matches']:
             yield match['matchId']
 	
@@ -166,7 +185,7 @@ class match(apirequest):
         return result
                 
         
-def getmatchIds(amount = 1000):
+def get_match_ids(amount = 1000):
     cursummoners = summoners(int(amount/2))
     matchIds = []
     reqcounter = 0
@@ -185,7 +204,7 @@ def getmatchIds(amount = 1000):
             
     return matchIds
     
-def getgamesmongo(amount):        
+def get_games_mongo(amount):        
     matchIds = getmatchIds(amount)
     reqcounter = 0
     for curmatchId in matchIds:
