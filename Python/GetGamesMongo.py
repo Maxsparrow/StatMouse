@@ -6,8 +6,10 @@ import pymongo
 import datetime
 import time
 import re
-from sys import argv
-#from Connections import *
+import sys
+import os
+sys.path.append(os.getcwd()+'/Python/')
+from Connections import *
 
 patchdate = datetime.date(2014,12,11)
 
@@ -19,8 +21,8 @@ class summoners(object):
         self.setids()
     
     def __repr__(self):
-        print len(self.ids)+' Summoner Ids'
-        print 'Next 10 summoner ids:'
+        print str(len(self.ids))+' Summoner Ids'
+        print 'Next 10 Summoner Ids:'
         return str(self.ids[self.ids_used:self.ids_used+10])
 
     def setids(self):
@@ -62,14 +64,12 @@ class apirequest(object):
     urlbase = 'http://na.api.pvp.net/api/lol/'
     region = 'na'
     apikey = '?api_key=0fb38d6c-f520-481e-ad6d-7ae773f90869'
-    ##TODO: add functionality to track requests to prevent hitting rate limit, and response codes
-    requesttracker = []
+    requesthistory = []
 
     def __init__(self,url):
         """Sets a url to use for a request. Must be done manually if not using predefined subclasses"""
         self.data = None
-        self.errorcounter = 0
-        
+        self.errorcounter = 0        
         if re.search('\?',url):
             self.url = url
         else:
@@ -83,62 +83,83 @@ class apirequest(object):
 
     def sendrequest(self):
         """Sends a request to the server based on init above"""
-        attemptcount = 0
-        while attemptcount <= 5:
-            try:		
+        while self.errorcounter <= 5:
+            try:
+                self.ratelimitcheck()		
                 f = urllib.urlopen(self.url)
                 jsondata = f.read()
                 apidata = json.loads(jsondata)
                 self.data = apidata
                 break
             except:
-                attemptcount += 1
+                self.errorcounter += 1
                 print 'Could not retrieve apidata, waiting one minute then retrying'
                 time.sleep(60)
-                if attemptcount == 5:
-                    print 'Not able to retrieve apidata, returning None value'
-                    self.data = None
+                if self.errorcounter == 5:
+                    self.errorcounter = 0
+                    raise IOError('Unknown error. Cannot retrieve apidata')
         ##Check the status of the data returned for error codes:
         if 'status' in self.data and self.data['status']['status_code']!=200:
             self.statuscheck()
         else:
             self.errorcounter = 0
+            
+    def ratelimitcheck(self):
+        ##Only allow 8 requests every 10 seconds to stay within the rate limit
+        if len(self.requesthistory)>8:
+            if (datetime.datetime.now()-self.requesthistory[-8]).seconds<10:
+                print 'Pausing 10 seconds for rate limit'
+                time.sleep(10)
+        self.requesthistory.append(datetime.datetime.now())
                     
     def statuscheck(self):
         statuscode = self.data['status']['status_code']
         if statuscode == 429:
-            print 'Rate limit exceeded, pausing 10 seconds and trying again'
+            print 'Error 429 Rate limit exceeded, pausing 10 seconds and trying again'
             self.errorcounter += 1
             time.sleep(10)
-            self.sendrequest()
+            if self.errorcounter <= 5:
+                self.sendrequest()
+            else:
+                self.errorcounter = 0
+                raise IOError('Hit error 5 times, cannot pull api data')                
         elif statuscode == 503 or statuscode == 500:
-            print 'API service unavailable, waiting 5 minutes and trying again'
+            print 'Error '+statuscode+' API service unavailable, waiting 5 minutes and trying again'
             self.errorcounter += 1
             time.sleep(300)
-            self.sendrequest()
+            if self.errorcounter <= 5:
+                self.sendrequest()
+            else:
+                self.errorcounter = 0
+                raise IOError('Hit error 5 times, cannot pull api data')
         elif statuscode == 400 or statuscode == 401 or statuscode == 404:
-            print 'Request error, returning None value'
-            self.data = None
+            raise IOError('Bad request, unable to pull api data')
     
 class matchhistory(apirequest):
     def __init__(self,summonerId):
         self.url = apirequest.urlbase + apirequest.region+'/v2.2/matchhistory/'+str(summonerId)+apirequest.apikey
-        self.data = None
+        apirequest.__init__(self,self.url)
 
-    def getmatchId(self):
-        """Generator to return matchIds one at a time"""
-        if 'matches' not in self.data['matches']:
+    def getmatch(self):
+        """Generator to return matchs one at a time"""
+        if self.data == None:
+            raise IOError('No api data. Use sendrequest method first.')
+        elif 'matches' not in self.data:
             raise IndexError('No matches available for this summoner')
         for match in self.data['matches']:
-            yield match['matchId']
+            yield match
 	
 class match(apirequest):
     def __init__(self,matchId,includeTimeline=False):
         """Initialize with url to get matchdata"""
         self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)  
+        apirequest.__init__(self,self.url)
 
     def addcustomstats(self):
         """Adds custom fields to the match data for participants,teams, and the main frames"""
+
+        if self.data == None:
+            raise IOError('No api data. Use sendrequest method first.')
 
         ##Find total gold for each team and the whole match
         team100Gold = 0
@@ -182,47 +203,40 @@ class match(apirequest):
         if counter == 0:            
             result = gamescoll.insert(self.data)
         mcon.disconnect()
-        return result
-                
+        return result                
         
-def get_match_ids(amount = 1000):
-    cursummoners = summoners(int(amount/2))
+def getmatchIds(amount = 1000):
     matchIds = []
-    reqcounter = 0
-    while len(matchIds) < amount:
-        m1 = matchhistory(cursummoners.getid())
-        m1.sendrequest()
-        reqcounter += 1
-        if reqcounter == 8:
-            print 'hit rate limit waiting 10 seconds'
-            reqcounter = 0
-            time.sleep(10)
-        if 'matches' in matchhistory.data:
-            for match in matchhistory.data['matches']:
+    s = summoners()
+    while len(matchIds)<amount:
+        mh = matchhistory(s.getid())
+        try:
+            mh.sendrequest()
+        except IOError as e:
+            print e, ', Skipping to next'
+            continue
+        try:
+            for match in mh.getmatch():
                 if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate:
                     matchIds.append(match['matchId'])
-            
+        except IndexError as e:
+            print e, ', Skipping to next'
     return matchIds
     
-def get_games_mongo(amount):        
+def getgamesmongo(amount):
     matchIds = getmatchIds(amount)
-    reqcounter = 0
-    for curmatchId in matchIds:
-        curmatchreq = apirequest('match',matchId=curmatchId,includeTimeline=True)
-        curmatchreq.sendrequest()
-        reqcounter += 1
-        if reqcounter == 8:
-            print 'hit rate limit waiting 10 seconds'
-            reqcounter = 0
-            time.sleep(10)    
-        if 'matchId' in curmatchreq.data:
-            curmatch = match(curmatchreq.data)
-            curmatch.addcustomstats()
-            print curmatch.addtomongo()    
+    for matchId in matchIds:
+        m = match(matchId,True)
+        try:
+            m.sendrequest()
+        except IOError as e:
+            print e, ', Skipping to next'
+            continue
+        m.addcustomstats()
+        print m.addtomongo()
             
-##TODO make match and matchhistory classes inheriting from apirequest?
-##Also consider making this function and the one above
-#script, amount = argv
+##Also consider making this function and the one above part of the above classes. or maybe subclasses
+#script, amount = sys.argv
 
 #getgamesmongo(int(amount))
 
