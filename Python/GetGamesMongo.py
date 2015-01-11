@@ -213,27 +213,39 @@ def getmatchIds(amount = 1000):
         try:
             mh.sendrequest()
         except IOError as e:
-            print e, ', Skipping to next'
+            print str(e) + ', skipping to next'
             continue
         try:
             for match in mh.getmatch():
-                if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate:
+                if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate and \
+                match['matchId'] not in matchIds:
                     matchIds.append(match['matchId'])
+                    if len(matchIds) % 50 == 0:
+                        print 'Currently have %d matchIds' % len(matchIds)
         except IndexError as e:
-            print e, ', Skipping to next'
+            print str(e) + ', skipping to next'
     return matchIds
     
 def getgamesmongo(amount):
     matchIds = getmatchIds(amount)
-    for matchId in matchIds:
-        m = match(matchId,True)
+    counter = 0
+    for matchId in matchIds:       
+        m = match(matchId,includeTimeline=True)
         try:
             m.sendrequest()
         except IOError as e:
-            print e, ', Skipping to next'
+            print str(e) + ', skipping to next'
             continue
         m.addcustomstats()
-        print m.addtomongo()
+        try:
+            m.addtomongo()
+            counter += 1
+        except:
+            print 'Error adding to mongodb, skipping to next'
+            continue
+        if counter % 50 == 0:
+            print 'Added %d games to MongoDB so far this session' % counter     
+    print 'Operation completed successfully, added %d games to MongoDB' % counter
             
 ##Also consider making this function and the one above part of the above classes. or maybe subclasses
 #script, amount = sys.argv
