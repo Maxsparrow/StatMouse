@@ -68,8 +68,8 @@ class apirequest(object):
 
     def __init__(self,url):
         """Sets a url to use for a request. Must be done manually if not using predefined subclasses"""
-        self.data = None
-        self.errorcounter = 0        
+        self.data = None     
+        self.errorcounter = 0
         if re.search('\?',url):
             self.url = url
         else:
@@ -90,12 +90,11 @@ class apirequest(object):
                 jsondata = f.read()
                 apidata = json.loads(jsondata)
                 self.data = apidata
-                self.errorcounter = 0
                 break
             except:
                 self.errorcounter += 1
-                print 'Could not retrieve apidata, retrying'
-                print self.url
+                print 'Attempt #%d, could not retrieve apidata, retrying' % self.errorcounter
+                time.sleep(5)
                 if self.errorcounter == 5:
                     self.errorcounter = 0
                     raise IOError('Unknown error. Cannot retrieve apidata')
@@ -225,6 +224,7 @@ def getmatchIds(amount = 1000):
         except IndexError as e:
             print str(e) + ', skipping to next'
             continue ##If there are no matches available for this summoner, skip to next
+    print 'Execution complete, have %d matchIds' % len(matchIds)
     return matchIds
     
 def getgamesmongo(matchIds):
@@ -249,9 +249,10 @@ def getgamesmongo(matchIds):
     print 'Operation completed successfully, added %d games to MongoDB' % counter
             
 ##Also consider making this function and the one above part of the above classes. or maybe subclasses
-#script, amount = sys.argv
 
-#matchIds = getmatchIds(int(amount))
-#getgamesmongo(matchIds)
+script, amount = sys.argv
+
+matchIds = getmatchIds(int(amount))
+getgamesmongo(matchIds)
 
 
