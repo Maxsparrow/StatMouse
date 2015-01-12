@@ -92,16 +92,19 @@ class apirequest(object):
                 self.data = apidata
                 break
             except:
-                self.errorcounter += 1
-                print 'Attempt #%d, could not retrieve apidata, retrying' % self.errorcounter
-                time.sleep(5)
                 if self.errorcounter == 5:
                     self.errorcounter = 0
-                    raise IOError('Unknown error. Cannot retrieve apidata')
+                    raise IOError('Unknown error. Cannot retrieve apidata after 5 attempts')
+                else:  
+                    self.errorcounter += 1                  
+                    print 'Could not retrieve apidata, retrying (attempt #%d)' % self.errorcounter
+                    time.sleep(5)
         ##Check the status of the data returned for error codes:
         if 'status' in self.data and self.data['status']['status_code']!=200:
             self.statuscheck()
-        else:
+        ##TODO: QA the below, not sure it is working right, as it never prints
+        elif self.errorcounter > 0:
+            print 'Retry succeeded'
             self.errorcounter = 0
             
     def ratelimitcheck(self):
@@ -224,7 +227,7 @@ def getmatchIds(amount = 1000):
         except IndexError as e:
             print str(e) + ', skipping to next'
             continue ##If there are no matches available for this summoner, skip to next
-    print 'Execution complete, have %d matchIds' % len(matchIds)
+    print 'Ready to get match data, have %d matchIds' % len(matchIds)
     return matchIds
     
 def getgamesmongo(matchIds):
