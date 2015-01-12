@@ -84,21 +84,21 @@ class apirequest(object):
     def sendrequest(self):
         """Sends a request to the server based on init above"""
         while self.errorcounter <= 5:
-            #try:
-            self.ratelimitcheck()		
-            f = urllib.urlopen(self.url)
-            jsondata = f.read()
-            apidata = json.loads(jsondata)
-            self.data = apidata
-            break
-            #except:
-            #    self.errorcounter += 1
-            #    print 'Could not retrieve apidata, waiting 10 seconds then retrying'
-            #    print self.url
-            #    time.sleep(10)
-            #    if self.errorcounter == 5:
-            #        self.errorcounter = 0
-            #        raise IOError('Unknown error. Cannot retrieve apidata')
+            try:
+                self.ratelimitcheck()		
+                f = urllib.urlopen(self.url)
+                jsondata = f.read()
+                apidata = json.loads(jsondata)
+                self.data = apidata
+                self.errorcounter = 0
+                break
+            except:
+                self.errorcounter += 1
+                print 'Could not retrieve apidata, retrying'
+                print self.url
+                if self.errorcounter == 5:
+                    self.errorcounter = 0
+                    raise IOError('Unknown error. Cannot retrieve apidata')
         ##Check the status of the data returned for error codes:
         if 'status' in self.data and self.data['status']['status_code']!=200:
             self.statuscheck()
@@ -218,17 +218,17 @@ def getmatchIds(amount = 1000):
             continue
         try:
             for match in mh.getmatch():
-                if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate and \
-                match['matchId'] not in matchIds:
+                if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate and match['matchId'] not in matchIds:
                     matchIds.append(match['matchId'])
                     if len(matchIds) % 50 == 0:
                         print 'Currently have %d matchIds' % len(matchIds)
         except IndexError as e:
+            print str(e) + ', skipping to next'
             continue ##If there are no matches available for this summoner, skip to next
     return matchIds
     
-def getgamesmongo(amount):
-    matchIds = getmatchIds(amount)
+def getgamesmongo(matchIds):
+    """Pass a list of matchIds to add each match to mongodb"""
     counter = 0
     for matchId in matchIds:       
         m = match(matchId,includeTimeline=True)
@@ -251,6 +251,7 @@ def getgamesmongo(amount):
 ##Also consider making this function and the one above part of the above classes. or maybe subclasses
 #script, amount = sys.argv
 
-#getgamesmongo(int(amount))
+#matchIds = getmatchIds(int(amount))
+#getgamesmongo(matchIds)
 
 
