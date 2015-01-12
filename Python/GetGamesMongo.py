@@ -102,7 +102,6 @@ class apirequest(object):
         ##Check the status of the data returned for error codes:
         if 'status' in self.data and self.data['status']['status_code']!=200:
             self.statuscheck()
-        ##TODO: QA the below, not sure it is working right, as it never prints
         elif self.errorcounter > 0:
             print 'Retry succeeded'
             self.errorcounter = 0
