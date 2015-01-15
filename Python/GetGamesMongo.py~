@@ -179,7 +179,6 @@ class match(apirequest):
             gameTowerKills += team['towerKills']  
             if team['teamId'] == 100:
                 team['goldEarned'] = team100Gold
-                team['goldEarnedPercentage'] = round(float(team['goldEarned'])/totalGameGold,6)
             elif team['teamId'] == 200:
                 team['goldEarned'] = team200Gold        
                 team['goldEarnedPercentage'] = round(float(team['goldEarned'])/totalGameGold,6)
