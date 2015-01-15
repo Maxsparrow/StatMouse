@@ -13,6 +13,38 @@ import re
 #    parsedmatch = parsematch(match)
 #    parsedmatchlist.append(parsedmatch)
 
+championId = 81
+participantonly = 	{'$unwind':'$participants'},					
+					{'$project':{'participants':1}},
+					{'$match':{'$participants.championId':championId}}
+						
+
+query: [{'$match':{'$participants.championId':championId}},
+		{'$project':
+			{'championId':{participantonly,{'$project':{'$participants.championId':1}}}},
+			'participantId':1,
+			'playerPercGold':'$stats.goldEarnedPercentage',
+			'KDA':'$stats.KDA',
+			'winner':'$stats.winner'}
+		},
+		{'$limit':1}
+		]
+						
+				# {matchId:1,
+				# matchDuration:1,
+				# matchCreation:1,
+				# gameTowerKills:'$stats.towerKills'
+			# }
+			
+def updatemongo(matchId):
+	##This is for fixing a team goldEarnedPercentage bug
+	mcon = pymongo.MongoClient('localhost',27017)
+	mdb = mcon.games
+	gamescoll = mdb.games
+	
+	gamescoll.update({'matchId':matchId},{'$set':{'$teams.goldEarnedPercentage':{$divide:['$teams.goldEarned','$match.stats.goldEarned'}}})
+				
+
 def parsematch(match):
     parsedmatch = {}
     
