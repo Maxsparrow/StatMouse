@@ -83,7 +83,7 @@ class apirequest(object):
 
     def sendrequest(self):
         """Sends a request to the server based on init above"""
-        while self.errorcounter <= 5:
+        while self.errorcounter <= 3:
             try:
                 self.ratelimitcheck()		
                 f = urllib.urlopen(self.url)
@@ -92,9 +92,9 @@ class apirequest(object):
                 self.data = apidata
                 break
             except:
-                if self.errorcounter == 5:
+                if self.errorcounter == 3:
                     self.errorcounter = 0
-                    raise IOError('Unknown error. Cannot retrieve apidata after 5 attempts')
+                    raise IOError('Unknown error. Cannot retrieve apidata after 3 attempts')
                 else:  
                     self.errorcounter += 1                  
                     print 'Could not retrieve apidata, retrying (attempt #%d)' % self.errorcounter
