@@ -11,8 +11,6 @@ import os
 sys.path.append(os.getcwd()+'/Python/')
 from Connections import *
 
-patchdate = datetime.date(2015,1,15)
-
 class summoners(object):
     def __init__(self):
         """Initialize list for summoner ids"""
@@ -66,14 +64,10 @@ class apirequest(object):
     apikey = '?api_key=0fb38d6c-f520-481e-ad6d-7ae773f90869'
     requesthistory = []
 
-    def __init__(self,url):
-        """Sets a url to use for a request. Must be done manually if not using predefined subclasses"""
+    def __init__(self):
+        """Set base data for apirequests"""
         self.data = None     
-        self.errorcounter = 0
-        if re.search('\?',url):
-            self.url = url
-        else:
-            self.url = url + apikey                 
+        self.errorcounter = 0        
 
     def __repr__(self):
         if self.data != None:
@@ -152,15 +146,24 @@ class matchhistory(apirequest):
             yield match
 	
 class match(apirequest):
-    def __init__(self,matchId,includeTimeline=False):
-        """Initialize with url to get matchdata"""
-        self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)  
-        apirequest.__init__(self,self.url)
+    def __init__(self,matchId):
+        """Initialize with base values from apirequest and matchId"""
+        apirequest.__init__(self)
+        self.matchId = matchId
+        
+    def fetchdata(self,includeTimeline=True):
+        ##Check if matchId already exists, if not, add to db and disconnect
+        mdata = gamescoll.find_one({'matchId':self.matchId})
+        if mdata == None
+            self.data = mdata
+        else:
+            self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)
+            self.sendrequest()
 
     def addcustomstats(self):
         """Adds custom fields to the match data for participants,teams, and the main frames"""
         if self.data == None:
-            raise IOError('No api data. Use sendrequest method first.')
+            raise IOError('No api data. Use getdata method first.')
 
         ##Find total gold for each team and the whole match
         team100Gold = 0
@@ -193,68 +196,26 @@ class match(apirequest):
         self.data['stats'] = {'goldEarned':totalGameGold,'towerKills':gameTowerKills}
 
     def addtomongo(self):
-        """Adds current matchdata to mongodb database; run after adding custom stats above"""
+        """Adds current matchdata to mongodb database or updates an existing match in mongodb"""
         mcon = pymongo.MongoClient('localhost',27017)
         mdb = mcon.games
-        gamescoll = mdb.games
-
-        ##Check if matchId already exists, if not, add to db and disconnect
-        mcursor = gamescoll.find({'matchId':self.data['matchId']})
-        counter = 0         
-        for item in mcursor: counter += 1
-        if counter == 0:            
-            result = gamescoll.insert(self.data)
+        gamescoll = mdb.games              
+        result = gamescoll.save(self.data)
         mcon.disconnect()
-        return result                
+        return result  
         
-def getmatchIds(amount = 1000):
-    matchIds = []
-    s = summoners()
-    while len(matchIds)<amount:
-        mh = matchhistory(s.getid())
-        try:
-            mh.sendrequest()
-        except IOError as e:
-            print str(e) + ', skipping to next'
-            continue
-        try:
-            for match in mh.getmatch():
-                if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate and match['matchId'] not in matchIds:
-                    matchIds.append(match['matchId'])
-                    if len(matchIds) % 50 == 0:
-                        print 'Currently have %d matchIds' % len(matchIds)
-        except IndexError as e:
-            print str(e) + ', skipping to next'
-            continue ##If there are no matches available for this summoner, skip to next
-    print 'Ready to get match data, have %d matchIds' % len(matchIds)
-    return matchIds
+def getbadmatch(self):
+    ##This is for fixing a team goldEarnedPercentage bug
+    mcon = pymongo.MongoClient('localhost',27017)
+    mdb = mcon.games
+    gamescoll = mdb.games
     
-def getgamesmongo(matchIds):
-    """Pass a list of matchIds to add each match to mongodb"""
-    counter = 0
-    for matchId in matchIds:       
-        m = match(matchId,includeTimeline=True)
-        try:
-            m.sendrequest()
-        except IOError as e:
-            print str(e) + ', skipping to next'
-            continue
-        m.addcustomstats()
-        try:
-            m.addtomongo()
-            counter += 1
-        except:
-            print 'Error adding to mongodb, skipping to next'
-            continue
-        if counter % 50 == 0:
-            print 'Added %d games to MongoDB so far this session' % counter     
-    print 'Operation completed successfully, added %d games to MongoDB' % counter
-            
-##Also consider making this function and the one above part of the above classes. or maybe subclasses
-
-script, amount = sys.argv
-
-matchIds = getmatchIds(int(amount))
-getgamesmongo(matchIds)
-
+    curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':0})
+    #curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':{'$exists':0}})
+    mcon.disconnect()
+    
+    match1 = match(curmatch['matchId'])
+    match1.fetchdata()
+    match1.addcustomstats()
+    match1.addtomongo()
 

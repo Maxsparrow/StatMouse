@@ -25,22 +25,6 @@ championId = 81
 				# gameTowerKills:'$stats.towerKills'
 			# }
 			
-def updatemongo():
-    ##This is for fixing a team goldEarnedPercentage bug
-    mcon = pymongo.MongoClient('localhost',27017)
-    mdb = mcon.games
-    gamescoll = mdb.games
-
-    curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':{'$exists':0}})
-
-    teams = curmatch['teams']
-    teams[0]['goldEarnedPercentage'] = round(teams[0]['goldEarned']/float(curmatch['stats']['goldEarned']),6)
-        
-    gamescoll.update({'_id':curmatch['_id']},{'$set':{'teams':teams}})
-
-    print 'updated id:'+str(curmatch['_id'])
-				
-
 def parsematch(match):
     parsedmatch = {}
     
