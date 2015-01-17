@@ -36,13 +36,19 @@ query: [{'$match':{'$participants.championId':championId}},
 				# gameTowerKills:'$stats.towerKills'
 			# }
 			
-def updatemongo(matchId):
+def updatemongo():
 	##This is for fixing a team goldEarnedPercentage bug
 	mcon = pymongo.MongoClient('localhost',27017)
 	mdb = mcon.games
 	gamescoll = mdb.games
 	
-	gamescoll.update({'matchId':matchId},{'$set':{'$teams.goldEarnedPercentage':{$divide:['$teams.goldEarned','$match.stats.goldEarned'}}})
+	cursor = gamescoll.findOne({'teams.0.goldEarnedPercentage':{'$exists':0}})
+	curmatch = cursor
+	
+    teams = curmatch['teams']
+    teams[0]['goldEarnedPercentage'] = teams[0]['goldEarned']/curmatch['stats']['goldEarned']
+        
+    gamescoll.update({'_id':curmatch['_id']},{'$set':{'teams':teams}})
 				
 
 def parsematch(match):
