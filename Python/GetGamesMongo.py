@@ -11,7 +11,7 @@ import os
 sys.path.append(os.getcwd()+'/Python/')
 from Connections import *
 
-patchdate = datetime.date(2014,12,11)
+patchdate = datetime.date(2015,1,15)
 
 class summoners(object):
     def __init__(self):

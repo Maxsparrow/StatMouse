@@ -14,21 +14,10 @@ import re
 #    parsedmatchlist.append(parsedmatch)
 
 championId = 81
-participantonly = 	{'$unwind':'$participants'},					
-					{'$project':{'participants':1}},
-					{'$match':{'$participants.championId':championId}}
+#participantonly = 	{'$unwind':'$participants'},{'$project':{'participants':1}},{'$match':{'$participants.championId':championId}}
 						
 
-query: [{'$match':{'$participants.championId':championId}},
-		{'$project':
-			{'championId':{participantonly,{'$project':{'$participants.championId':1}}}},
-			'participantId':1,
-			'playerPercGold':'$stats.goldEarnedPercentage',
-			'KDA':'$stats.KDA',
-			'winner':'$stats.winner'}
-		},
-		{'$limit':1}
-		]
+#query = [{'$match':{'$participants.championId':championId}},{'$project':{'championId':{participantonly,{'$project':{'$participants.championId':1}}}},'participantId':1,'playerPercGold':'$stats.goldEarnedPercentage',			'KDA':'$stats.KDA','winner':'$stats.winner'}},{'$limit':1}]
 						
 				# {matchId:1,
 				# matchDuration:1,
@@ -37,18 +26,19 @@ query: [{'$match':{'$participants.championId':championId}},
 			# }
 			
 def updatemongo():
-	##This is for fixing a team goldEarnedPercentage bug
-	mcon = pymongo.MongoClient('localhost',27017)
-	mdb = mcon.games
-	gamescoll = mdb.games
-	
-	cursor = gamescoll.findOne({'teams.0.goldEarnedPercentage':{'$exists':0}})
-	curmatch = cursor
-	
+    ##This is for fixing a team goldEarnedPercentage bug
+    mcon = pymongo.MongoClient('localhost',27017)
+    mdb = mcon.games
+    gamescoll = mdb.games
+
+    curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':{'$exists':0}})
+
     teams = curmatch['teams']
-    teams[0]['goldEarnedPercentage'] = teams[0]['goldEarned']/curmatch['stats']['goldEarned']
+    teams[0]['goldEarnedPercentage'] = round(teams[0]['goldEarned']/float(curmatch['stats']['goldEarned']),6)
         
     gamescoll.update({'_id':curmatch['_id']},{'$set':{'teams':teams}})
+
+    print 'updated id:'+str(curmatch['_id'])
 				
 
 def parsematch(match):
