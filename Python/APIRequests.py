@@ -150,6 +150,8 @@ class match(apirequest):
         """Initialize with base values from apirequest and matchId"""
         apirequest.__init__(self)
         self.matchId = matchId
+        self.parsed = None
+        self.inmongo = {}
         
     def fetchdata(self,includeTimeline=True):
         ##Check if matchId already exists, if not, add to db and disconnect
@@ -158,12 +160,30 @@ class match(apirequest):
         gamescoll = mdb.full
         mdata = gamescoll.find_one({'matchId':self.matchId})
         if mdata is not None:
-            self.inmongo = True
+            self.inmongo['full'] = True
             self.data = mdata
         else:
-            self.inmongo = False
+            self.inmongo['full'] = False
             self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(self.matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)
             self.sendrequest()
+            self.addcustomstats()
+            
+    def fetchparsed(self):
+        if self.parsed != None:
+            raise IOError('Already fetched, use .parsed to view')
+        parsedmatches = []
+        mcon = pymongo.MongoClient('localhost',27017)
+        mdb = mcon.games
+        gamescoll = mdb.parsed
+        cursor = gamescoll.find({'matchId':self.matchId})
+        for record in cursor:
+            parsedmatches.append(record)
+        if parsedmatches != []:
+            self.inmongo['parsed'] = True
+            self.parsed = parsedmatches
+        else:
+            self.inmongo['parsed'] = False
+            self.parsematch()                    
 
     def addcustomstats(self):
         """Adds custom fields to the match data for participants,teams, and the main frames"""
@@ -200,17 +220,87 @@ class match(apirequest):
         ##Adds custom fields to the main frame
         self.data['stats'] = {'goldEarned':totalGameGold,'towerKills':gameTowerKills}
 
-    def addtomongo(self):
-        ##TODO: Build this out further. Consider using 'newonly' variable in method to only add new matches to the database. Also allow choosing the collection full vs parsed
-        """Adds current matchdata to mongodb database or updates an existing match in mongodb"""
+    def addtomongo(self,collection,newonly=True):
+        """Adds current matchdata to mongodb database or updates an existing match in mongodb. Use collection to specify full or parsed matches"""
+        if (newonly==True and self.inmongo[collection]==True):
+            raise IOError('matchId already in '+collection+' collection')
+        
+        results=[]                    
         mcon = pymongo.MongoClient('localhost',27017)
         mdb = mcon.games
-        gamescoll = mdb.full              
-        result = gamescoll.save(self.data)
-        mcon.disconnect()
-        return result  
+        if collection == 'full':
+            gamescoll = mdb.full           
+            results = gamescoll.save(self.data)          
+        elif collection == 'parsed':
+            gamescoll = mdb.parsed
+            for record in self.parsed:
+                result = gamescoll.save(record)
+                results.append(result)
+        else:
+            raise IOError('Invalid collection name')
         
-    ##TODO decide on a schema for parsed matches and how we want to store them and use them
+        mcon.disconnect()
+        return results 
+          
+    def parsematch(self):        
+        if self.data == None:
+                raise IOError('No api data. Use getdata method first.')
+                
+        parsedmatches = []
+        
+        keystokeep = ['matchId','matchDuration','matchCreation']
+        for index in range(10):
+            parsedmatch = {}             
+            
+            parsedmatch = {k:self.data[k] for k in keystokeep}
+            
+            ##Match info
+            parsedmatch['gameTowerKills'] = self.data['stats']['towerKills']  
+            
+            ##Participant info  
+            parsedmatch['championId'] = self.data['participants'][index]['championId']
+            parsedmatch['participantId'] = self.data['participants'][index]['participantId']    
+            parsedmatch['playerPercGold'] = self.data['participants'][index]['stats']['goldEarnedPercentage']
+            parsedmatch['KDA'] = self.data['participants'][index]['stats']['KDA']
+            parsedmatch['winner'] = self.data['participants'][index]['stats']['winner']
+            parsedmatch['teamId'] = self.data['participants'][index]['teamId']
+            
+            ##Summoner info
+            for identity in self.data['participantIdentities']:
+                if identity['participantId'] == parsedmatch['participantId']:
+                    break    
+            parsedmatch['summonerId'] = identity['player']['summonerId']
+            parsedmatch['summonerName'] = identity['player']['summonerName']
+            
+            ##Team info
+            for team in self.data['teams']:
+                if team['teamId'] == parsedmatch['teamId']:
+                    break
+            parsedmatch['teamPercGold'] = team['goldEarnedPercentage']
+            parsedmatch['teamTowerKills'] = team['towerKills']
+            parsedmatch['teamDragonKills'] = team['dragonKills']
+            parsedmatch['teamBaronKills'] = team['baronKills']
+            
+            ####Getting all the items out from timeline
+            ordercounter = 0
+            items = {}
+            eventtimes = self.data['timeline']['frames'][1:]
+            for eventtime in eventtimes:
+                for event in eventtime['events']:
+                    if event['eventType'] == 'ITEM_PURCHASED' and event['participantId'] == parsedmatch['participantId']:
+                        ##For each item we add, find the current count of that item in the itemlist, so we can name the item with a . on the end and the item count of that item
+                        regex = re.compile(str(event['itemId']))
+                        itemcounter = len([l for l in items if regex.search(l)])+1
+                        items[str(event['itemId'])+'_'+str(itemcounter)] = ordercounter
+                try:
+                    ordercounter = max(items.values())+1
+                except:
+                    ordercounter = ordercounter
+            parsedmatch['items'] = items
+            
+            parsedmatches.append(parsedmatch)
+            
+        self.parsed = parsedmatches
         
 def getbadmatch():
     ##This is for fixing a team goldEarnedPercentage bug

@@ -28,26 +28,34 @@ def getmatchIds(amount = 1000):
     
 def getgamesmongo(matchIds):
     """Pass a list of matchIds to add each match to mongodb"""
-    counter = 0
+    fullcounter = 0
+    parsedcounter = 0
     for matchId in matchIds:       
         m = match(matchId)
         try:
             m.fetchdata()
         except IOError as e:
-            print str(e) + ', skipping to next'
+            print str(e) + '. Cannot get match data, skipping to next'
             continue
-        m.addcustomstats()
-        ##Check to see if it is already in mongodb before adding, we only want new matches
-        if not m.inmongo:  
-            try:
-                m.addtomongo()
-                counter += 1
-            except:
-                print 'Error adding to mongodb, skipping to next'
-                continue
-        if counter % 50 == 0:
-            print 'Added %d games to MongoDB so far this session' % counter     
-    print 'Operation completed successfully, added %d games to MongoDB' % counter
+        try:
+            m.fetchparsed()
+        except IOError as e:
+            print str(e) + '. Cannot get parsed data, will add full data if possible'
+        
+        ##Try to add to mongodb, will output error if it already is there
+        try:
+            m.addtomongo('full')
+            fullcounter += 1
+        except IOError as e:
+            print str(e) + '. Cannot add full data, will add parsed data if possible'
+        try:
+            m.addtomongo('parsed')
+            parsedcounter += 1
+        except IOError as e:
+            print str(e) + ', Cannot add parsed data, moving on to next match'
+        if fullcounter % 50 == 0:
+            print 'Added %d games to MongoDB full collection and %d records to MongoDB parsed collection so far this session' % (fullcounter, parsedcounter)
+    print 'Operation completed successfully, added %d games to MongoDB full collection and %d records to MongoDB parsed collection' % (fullcounter, parsedcounter)
             
 ##Also consider making this function and the one above part of the above classes. or maybe subclasses
 
