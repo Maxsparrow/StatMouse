@@ -153,11 +153,16 @@ class match(apirequest):
         
     def fetchdata(self,includeTimeline=True):
         ##Check if matchId already exists, if not, add to db and disconnect
+        mcon = pymongo.MongoClient('localhost',27017)
+        mdb = mcon.games
+        gamescoll = mdb.full
         mdata = gamescoll.find_one({'matchId':self.matchId})
-        if mdata == None
+        if mdata is not None:
+            self.inmongo = True
             self.data = mdata
         else:
-            self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)
+            self.inmongo = False
+            self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(self.matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)
             self.sendrequest()
 
     def addcustomstats(self):
@@ -196,26 +201,29 @@ class match(apirequest):
         self.data['stats'] = {'goldEarned':totalGameGold,'towerKills':gameTowerKills}
 
     def addtomongo(self):
+        ##TODO: Build this out further. Consider using 'newonly' variable in method to only add new matches to the database. Also allow choosing the collection full vs parsed
         """Adds current matchdata to mongodb database or updates an existing match in mongodb"""
         mcon = pymongo.MongoClient('localhost',27017)
         mdb = mcon.games
-        gamescoll = mdb.games              
+        gamescoll = mdb.full              
         result = gamescoll.save(self.data)
         mcon.disconnect()
         return result  
         
-def getbadmatch(self):
+    ##TODO decide on a schema for parsed matches and how we want to store them and use them
+        
+def getbadmatch():
     ##This is for fixing a team goldEarnedPercentage bug
     mcon = pymongo.MongoClient('localhost',27017)
     mdb = mcon.games
-    gamescoll = mdb.games
+    gamescoll = mdb.full
     
-    curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':0})
-    #curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':{'$exists':0}})
+    curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':{'$exists':0}})
     mcon.disconnect()
     
+    print curmatch['matchId']
     match1 = match(curmatch['matchId'])
     match1.fetchdata()
     match1.addcustomstats()
-    match1.addtomongo()
+    print match1.addtomongo()
 

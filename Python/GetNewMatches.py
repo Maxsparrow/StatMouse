@@ -30,19 +30,21 @@ def getgamesmongo(matchIds):
     """Pass a list of matchIds to add each match to mongodb"""
     counter = 0
     for matchId in matchIds:       
-        m = match(matchId,includeTimeline=True)
+        m = match(matchId)
         try:
-            m.sendrequest()
+            m.fetchdata()
         except IOError as e:
             print str(e) + ', skipping to next'
             continue
         m.addcustomstats()
-        try:
-            m.addtomongo()
-            counter += 1
-        except:
-            print 'Error adding to mongodb, skipping to next'
-            continue
+        ##Check to see if it is already in mongodb before adding, we only want new matches
+        if not m.inmongo:  
+            try:
+                m.addtomongo()
+                counter += 1
+            except:
+                print 'Error adding to mongodb, skipping to next'
+                continue
         if counter % 50 == 0:
             print 'Added %d games to MongoDB so far this session' % counter     
     print 'Operation completed successfully, added %d games to MongoDB' % counter
