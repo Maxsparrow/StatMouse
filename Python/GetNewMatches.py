@@ -15,9 +15,9 @@ def getmatchIds(amount = 1000):
             print str(e) + ', skipping to next'
             continue
         try:
-            for match in mh.getmatch():
-                if datetime.date.fromtimestamp(match['matchCreation']/1000) > patchdate and match['matchId'] not in matchIds:
-                    matchIds.append(match['matchId'])
+            for record in mh.getmatch():
+                if datetime.date.fromtimestamp(record['matchCreation']/1000) > patchdate and record['matchId'] not in matchIds and record['queueType']==['RANKED_SOLO_5x5']:
+                    matchIds.append(record['matchId'])
                     if len(matchIds) % 50 == 0:
                         print 'Currently have %d matchIds' % len(matchIds)
         except IndexError as e:

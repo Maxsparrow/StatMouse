@@ -77,6 +77,7 @@ class apirequest(object):
 
     def sendrequest(self):
         """Sends a request to the server based on init above"""
+        ##TODO: Switch to using requests module isntead of urllib
         while self.errorcounter <= 3:
             try:
                 self.ratelimitcheck()		
@@ -132,9 +133,9 @@ class apirequest(object):
             raise IOError('Bad request, unable to pull api data')
     
 class matchhistory(apirequest):
-    def __init__(self,summonerId):
+    def __init__(self,summonerId):        
+        apirequest.__init__(self)
         self.url = apirequest.urlbase + apirequest.region+'/v2.2/matchhistory/'+str(summonerId)+apirequest.apikey
-        apirequest.__init__(self,self.url)
 
     def getmatch(self):
         """Generator to return matchs one at a time"""
@@ -225,6 +226,7 @@ class match(apirequest):
         if (newonly==True and self.inmongo[collection]==True):
             raise IOError('matchId already in '+collection+' collection')
         
+        ##TODO: Add function or class for connecting to mongo
         results=[]                    
         mcon = pymongo.MongoClient('localhost',27017)
         mdb = mcon.games
@@ -284,8 +286,10 @@ class match(apirequest):
             ####Getting all the items out from timeline
             ordercounter = 0
             items = {}
-            eventtimes = self.data['timeline']['frames'][1:]
+            eventtimes = self.data['timeline']['frames']
             for eventtime in eventtimes:
+                if 'events' not in eventtime:
+                    continue
                 for event in eventtime['events']:
                     if event['eventType'] == 'ITEM_PURCHASED' and event['participantId'] == parsedmatch['participantId']:
                         ##For each item we add, find the current count of that item in the itemlist, so we can name the item with a . on the end and the item count of that item
