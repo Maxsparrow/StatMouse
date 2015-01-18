@@ -1,6 +1,7 @@
 import sys
+import os
 sys.path.append(os.getcwd()+'/Python/')
-import APIRequests
+from APIRequests import *
 
 patchdate = datetime.date(2015,1,15)
 

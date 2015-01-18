@@ -1,6 +1,7 @@
 import sys
+import os
 sys.path.append(os.getcwd()+'/Python/')
-import APIRequests
+from APIRequests import *
 
 mcon = pymongo.MongoClient('localhost',27017)
 mdb = mcon.games
@@ -10,15 +11,10 @@ print 'getting matchIds in mongo'
 cursor = gamescoll.find()
 
 matchIds = []
-for record in cursor:
-    matchIds.append(record['matchId'])
-    
-print 'Parsing %d matches' % len(matchIds)
-    
 counter = 0
-for matchId in matchIds:
-    m = match(matchId)
-    m.fetchdata()
+for record in cursor:
+    m = match(record['matchId'])
+    m.data = record
     m.fetchparsed()
     try:
         m.addtomongo('parsed')

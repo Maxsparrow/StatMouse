@@ -133,7 +133,7 @@ class apirequest(object):
             raise IOError('Bad request, unable to pull api data')
     
 class matchhistory(apirequest):
-    def __init__(self,summonerId):        
+    def __init__(self,summonerId):      
         apirequest.__init__(self)
         self.url = apirequest.urlbase + apirequest.region+'/v2.2/matchhistory/'+str(summonerId)+apirequest.apikey
 
