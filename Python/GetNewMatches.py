@@ -56,7 +56,7 @@ def getgamesmongo(matchIds):
             print str(e) + ', Cannot add parsed data, moving on to next match'
         if fullcounter % 50 == 0:
             print 'Added %d games to MongoDB full collection and %d records to MongoDB parsed collection so far this session' % (fullcounter, parsedcounter)
-    print 'Operation completed successfully, added %d games to MongoDB full collection and %d records to MongoDB parsed collection' % (fullcounter, parsedcounter)
+    print 'Operation completed successfully, added %d games to MongoDB full collection and %d games to MongoDB parsed collection' % (fullcounter, parsedcounter)
             
 ##Also consider making this function and the one above part of the above classes. or maybe subclasses
 
