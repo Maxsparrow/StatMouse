@@ -121,7 +121,7 @@ class apirequest(object):
                 self.errorcounter = 0
                 raise IOError('Hit error 5 times, cannot pull api data')                
         elif statuscode == 503 or statuscode == 500:
-            print 'Error '+statuscode+' API service unavailable, waiting 5 minutes and trying again'
+            print 'Error '+str(statuscode)+' API service unavailable, waiting 5 minutes and trying again'
             self.errorcounter += 1
             time.sleep(300)
             if self.errorcounter <= 5:
