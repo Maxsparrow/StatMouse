@@ -3,7 +3,7 @@ import os
 sys.path.append(os.getcwd()+'/Python/')
 from APIRequests import *
 
-patchdate = datetime.date(2015,1,15)
+patchdate = datetime.date(2015,1,29)
 
 def getmatchIds(amount = 1000):
     matchIds = []
