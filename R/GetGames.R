@@ -14,7 +14,7 @@ getgames<-function(summonerids=NA,limit=50000) {
     con<-reconnectdb("statmous_gamedata")    
     
     ##Read in cached summonerIds from database as a vector
-    summonerids<-dbGetQuery(con,'SELECT summonerId FROM statmous_gamedata.summoners;')[,1]
+    summonerids<-DBI::dbGetQuery(con,'SELECT summonerId FROM statmous_gamedata.summoners;')[,1]
     
     ##Find any previous matches since the last patch, so when we get new matches, we can check for duplicate matchIds
     previousmatches<-dbGetQuery(con,paste0("SELECT matchId FROM statmous_gamedata.games WHERE createDate >= '",patchdate,"';"))
