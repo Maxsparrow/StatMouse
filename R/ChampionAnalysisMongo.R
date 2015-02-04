@@ -18,8 +18,8 @@ makeparseddata<- function(championId,setlimit) {
         if(length(itemlist)==0) {
             next #if there are no items for this player, they were afk, so skip it
         }
-        ##Remove itemcounts over 10
-        itemlist<-itemlist[!grepl("_1.|_2.|_3.|_4.|_5.|_6.|_7.|_8.|_9.",names(itemlist))]
+        ##For now, only keep first item count of each item to make analysis simpler
+        itemlist<-itemlist[grepl("_1$",names(itemlist))]
         
         newrow<-subset(rawgamespull[row,],select=c(-items,-X_id))
         gamedata<-rbind(gamedata,newrow)
@@ -31,12 +31,12 @@ makeparseddata<- function(championId,setlimit) {
 }
 
 addclusters <- function(champgames,numclusters=5) {
-    
-    ##Remove potions and biscuits since they mess things up
-    champgames$itemframe<-champgames$itemframe[,!grepl("2003|2004|2010",colnames(champgames$itemframe))]
     champgames$itemframe[is.na(champgames$itemframe)]<-100
     
     fitcl<-kmeans(champgames$itemframe,numclusters)
+    ##Consider trying dbscan. Had issues in first attempts
+    #library(fpc)
+    #fitcl<-dbscan(champgames$itemframe,nrow(champgames$itemframe)/6)
     
     champgames$gamedata$cluster <- fitcl$cluster
     champgames$itemframe$cluster <- fitcl$cluster
@@ -47,16 +47,19 @@ clusteranalysis<-function(champgames) {
     numclusters<-max(champgames$itemframe$cluster)
     
     buildorderframe<-data.frame()
-    for(cluster in 1:numclusters) {
+    ##TODO: Find a way to analyze clusters and pull out the most common holistic build, fairly difficult to assess
+    for(cluster in unique(champgames$itemframe$cluster)) {
+        ##Medians method, has flaws, doesn't account for all orders and misses some items
         medians<-sapply(champgames$itemframe[champgames$itemframe$cluster==cluster,],median)
-        medians<-medians[medians<=20]
+        #medians<-medians[medians<=20]
         
         orderframe<-data.frame()
-        for(order in 0:20) {
+        for(order in 0:99) {
             ordermedians<-medians[medians==order]
+            ordermedians<-ordermedians[!grepl("cluster",names(ordermedians))]
             if(length(ordermedians)==0) next
             itemId<-substr(names(ordermedians),2,5)
-            orderframe<-rbind(orderframe,data.frame(build=cluster,order,itemId))
+            orderframe<-rbind(orderframe,data.frame(build=cluster,order=ifelse(order==0,0,max(orderframe$order)+1),itemId))
         }
         buildorderframe<-rbind(buildorderframe,orderframe)
     }
@@ -75,53 +78,46 @@ clusteranalysis<-function(champgames) {
 
 rankclusters<-function(champgames) {
     library(caret)
+    numclusters<-length(unique(champgames$gamedata$cluster))
     champgames$gamedata$winner<-as.factor(as.numeric(as.logical(champgames$gamedata$winner)))
     champgames$gamedata$cluster<-as.factor(as.character(champgames$gamedata$cluster))
     formula<-as.formula("winner~teamPercGold+playerPercGold+teamBaronKills+teamDragonKills+
                             teamTowerKills+matchDuration+gameTowerKills+KDA+cluster-1")
     
-#     ##base method
-#     model<-glm(formula,data=champgames$gamedata,family=binomial)
-#     imp<-round(coef(model),6)
-#     modelsummary<-data.frame(importance=imp,variable=names(imp))
-    
+    ##TODO: split the cluster variables into 3 separate fields for the purpose of model building. will make interpretation easier
     ##Caret Method
     model<-train(formula,data=champgames$gamedata,method='glm')
-    imp<-varImp(model,scale=FALSE,usemodel=FALSE)
-    modelsummary<-data.frame(importance=round(imp$importance,6),variable=row.names(imp$importance))
     
-    modelsummary<-modelsummary[order(-modelsummary[,1]),]
-
-    ##Check to make sure cluster5 isn't already in the names
-    if(sum(grepl("cluster5",modelsummary$variable))>0) {stop("relevel cluster factors, cluster5 should be last")}
-    ##Create cluster ranks and add cluster5 as 0
-    clusterranks<-data.frame(cluster=gsub("cluster","",c(as.character(modelsummary[grepl("cluster",modelsummary$variable),"variable"]),
-                                                         "cluster5")),rank=c(1,2,3,4,5))
+    ##Find coefficients
+    coefs<-model$finalModel$coef
+    coefs<-coefs[grepl("cluster",names(coefs))]
+    coefs[is.na(coefs)]<-0
+    coefs<-coefs[order(-coefs)]
     
-    return(clusterranks)
+    clusterscores<-data.frame(cluster=gsub("cluster","",names(coefs)),buildscore=round(coefs,6))
+    return(clusterscores)
 }
 
-runallchampions <- function() {    
-    champtable<-champtablecreate()
-    championIds<-as.character(unique(champtable$champ_id))
+analyzechampions <- function(championIds="ALL") {    
+    if(championIds=="ALL") {
+        champtable<-champtablecreate()
+        championIds<-as.character(unique(champtable$champ_id))        
+    }
         
     allchamps<-data.frame()
-    for(id in championIds[1:2]) {
+    for(id in championIds) {
         champgames<-makeparseddata(id,1000)
-        champgames<-addclusters(champgames)
+        champgames<-addclusters(champgames,3)
         buildorderframe<-clusteranalysis(champgames)
-        clusterranks<-rankclusters(champgames)
+        clusterscores<-rankclusters(champgames)
         
-        ##Add cluster ranks
-        buildorderframe<-merge(buildorderframe,clusterranks,by.x="build",by.y="cluster")
-        ##Remove old 'buildcluster' id before adding to db, just change to buildrank
-        buildorderframe$buildrank<-buildorderframe$rank
-        buildorderframe<-buildorderframe[c("buildrank","order","itemId","itemName")]
-        buildorderframe<-buildorderframe[order(buildorderframe$buildrank),]
+        ##Add cluster scores
+        buildorderframe<-merge(buildorderframe,clusterscores,by.x="build",by.y="cluster")
+        buildorderframe<-buildorderframe[order(-buildorderframe$buildscore),]
         
         buildorderframe<-cbind(championId=id,buildorderframe)
-        allchamps<-rbind(allchamps,buildorderframe)
+        championanalysis<-rbind(allchamps,buildorderframe)
     }
     
-    return(allchamps)
+    return(championanalysis)
 }
