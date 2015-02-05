@@ -25,6 +25,9 @@ makeparseddata<- function(championId,setlimit) {
         gamedata<-rbind(gamedata,newrow)
         fullitemframe<-rbind.fill(fullitemframe,data.frame(itemlist))
     }
+    
+    ##Setting winner as a number factor, seems more intuitive
+    gamedata$winner<-as.factor(as.numeric(as.logical(gamedata$winner)))
 
     champgames<-list(gamedata=gamedata,itemframe=fullitemframe)
     return(champgames)
@@ -65,7 +68,6 @@ clusteranalysis<-function(champgames) {
     }
     
     if(!exists("itemtable")) {
-        source('./StatMouse/R/SharedAssets.R')
         itemtable<-itemtablecreate()
         itemtable<<-itemtable
     }
@@ -79,14 +81,35 @@ clusteranalysis<-function(champgames) {
 rankclusters<-function(champgames) {
     library(caret)
     numclusters<-length(unique(champgames$gamedata$cluster))
-    champgames$gamedata$winner<-as.factor(as.numeric(as.logical(champgames$gamedata$winner)))
     champgames$gamedata$cluster<-as.factor(as.character(champgames$gamedata$cluster))
+    
+    ##Create train and test set
+    inTrain<-createDataPartition(champgames$gamedata$winner,p=0.6,list=FALSE)
+    trainset<-champgames$gamedata[inTrain,]
+    testset<-champgames$gamedata[-inTrain,]
+    
     formula<-as.formula("winner~teamPercGold+playerPercGold+teamBaronKills+teamDragonKills+
                             teamTowerKills+matchDuration+gameTowerKills+KDA+cluster-1")
     
     ##TODO: split the cluster variables into 3 separate fields for the purpose of model building. will make interpretation easier
     ##Caret Method
-    model<-train(formula,data=champgames$gamedata,method='glm')
+    model<-train(formula,data=trainset,method='glm')
+    
+    ####Measure model performance
+    n<-nrow(testset)
+    ##Get predictions
+    ##TODO: Fix this, need the separate cluster fields I think
+    pred<-predict(model$finalModel,subset(testset,select=-winner),type="response") 
+    predbin<-pred
+    predbin[predbin<0.5]<-0
+    predbin[predbin>=0.5]<-1
+    
+    ##Find percent correct out of all observations
+    predtable<-table(predbin,testset[,"winner"])
+    print(predtable)
+    perccorrect<-(predtable[1,1]+predtable[2,2])/n
+    print(paste("Percent correct as binary:",round(perccorrect,4)))
+    
     
     ##Find coefficients
     coefs<-model$finalModel$coef
@@ -98,10 +121,16 @@ rankclusters<-function(champgames) {
     return(clusterscores)
 }
 
-analyzechampions <- function(championIds="ALL") {    
-    if(championIds=="ALL") {
+analyzechampions <- function(championName) {    
+    
+    if(!exists("champtable")) {
         champtable<-champtablecreate()
+        champtable<<-champtable
+    }
+    if(championName=="ALL") {
         championIds<-as.character(unique(champtable$champ_id))        
+    } else {
+        championIds<-champtable[champtable$champ_name==championName,"champ_id"]
     }
         
     allchamps<-data.frame()
