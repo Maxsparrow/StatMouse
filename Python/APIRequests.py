@@ -1,6 +1,6 @@
 import pymysql
 import random
-import urllib
+import urllib2
 import json
 import pymongo
 import datetime
@@ -59,7 +59,7 @@ class summoners(object):
 class apirequest(object):
     #Example URL:
     #http://na.api.pvp.net/api/lol/na/v2.2/matchhistory/102935?api_key=0fb38d6c-f520-481e-ad6d-7ae773f90869
-    urlbase = 'http://na.api.pvp.net/api/lol/'
+    urlbase = 'https://na.api.pvp.net/api/lol/'
     region = 'na'
     apikey = '?api_key=0fb38d6c-f520-481e-ad6d-7ae773f90869'
     requesthistory = []
@@ -81,7 +81,7 @@ class apirequest(object):
         while self.errorcounter <= 3:
             try:
                 self.ratelimitcheck()		
-                f = urllib.urlopen(self.url)
+                f = urllib2.urlopen(self.url)
                 jsondata = f.read()
                 apidata = json.loads(jsondata)
                 self.data = apidata
@@ -103,11 +103,11 @@ class apirequest(object):
             
     def ratelimitcheck(self):
         ##Only allow 8 requests every 10 seconds to stay within the rate limit
-        if len(self.requesthistory)>8:
-            if (datetime.datetime.now()-self.requesthistory[-8]).seconds<10:
+        if len(apirequest.requesthistory)>8:
+            if (datetime.datetime.now()-apirequest.requesthistory[-8]).seconds<10:
                 print 'Pausing 10 seconds for rate limit'
                 time.sleep(10)
-        self.requesthistory.append(datetime.datetime.now())
+        apirequest.requesthistory.append(datetime.datetime.now())
                     
     def statuscheck(self):
         statuscode = self.data['status']['status_code']
