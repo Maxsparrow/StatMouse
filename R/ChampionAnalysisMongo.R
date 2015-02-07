@@ -96,6 +96,21 @@ clusteranalysismedians<-function(champgames) {
         buildorderframe<-rbind(buildorderframe,orderframe)
     }
     
+    ##Unique order item freq method
+    ##NEED TO TEST THIS
+    cluster=1
+    clusterset<-champgames$itemframe[champgames$itemframe$cluster==1,]
+    fullorderframe<-data.frame()
+    for (order in 0:20) {
+        ordercounts<-sapply(clusterset,function(x) sum(x==order))
+        orderperc<-ordercounts/sum(ordercounts)
+        orderperc<-orderperc[!names(orderperc) %in% fullorderframe]
+        filterorderperc<-orderperc[orderperc>0.1]
+        orderperctouse<-ifelse(length(filterorderperc)==0,head(orderperc[order(-orderperc)],3),filterorderperc)
+        orderframe<-data.frame(order,orderperctouse,itemId=names(filterorderperc))
+        fullorderframe <- rbind(fullorderframe,orderframe)
+    }
+    
     if(!exists("itemtable")) {
         itemtable<-itemtablecreate()
         itemtable<<-itemtable
