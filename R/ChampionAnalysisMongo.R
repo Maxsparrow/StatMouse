@@ -46,11 +46,11 @@ addclusters <- function(champgames,numclusters=5) {
     return(champgames)
 }
     
-clusteranalysis<-function(champgames) {
+clusteranalysis<-function(champgames,method) {
     numclusters<-max(champgames$itemframe$cluster)
+    ##TODO: Find a way to analyze clusters and pull out the most common holistic build, fairly difficult to assess
     
     buildorderframe<-data.frame()
-    ##TODO: Find a way to analyze clusters and pull out the most common holistic build, fairly difficult to assess
     for(cluster in unique(champgames$itemframe$cluster)) {
         ##Medians method, has flaws, doesn't account for all orders and misses some items
         medians<-sapply(champgames$itemframe[champgames$itemframe$cluster==cluster,],median)
@@ -79,45 +79,13 @@ clusteranalysis<-function(champgames) {
 }
 
 rankclusters<-function(champgames) {
-    library(caret)
-    numclusters<-length(unique(champgames$gamedata$cluster))
-    champgames$gamedata$cluster<-as.factor(as.character(champgames$gamedata$cluster))
+    champgames$gamedata$cluster<-as.numeric(as.character(champgames$gamedata$cluster))
+    champgames$gamedata$winner<-as.numeric(as.character(champgames$gamedata$winner))
     
-    ##Create train and test set
-    inTrain<-createDataPartition(champgames$gamedata$winner,p=0.6,list=FALSE)
-    trainset<-champgames$gamedata[inTrain,]
-    testset<-champgames$gamedata[-inTrain,]
+    ##Pure winrate method, works pretty well
+    clusterscores<-aggregate(winner~cluster,data=champgames$gamedata,mean)
+    colnames(clusterscores)[2]<-"buildscore"    
     
-    formula<-as.formula("winner~teamPercGold+playerPercGold+teamBaronKills+teamDragonKills+
-                            teamTowerKills+matchDuration+gameTowerKills+KDA+cluster-1")
-    
-    ##TODO: split the cluster variables into 3 separate fields for the purpose of model building. will make interpretation easier
-    ##Caret Method
-    model<-train(formula,data=trainset,method='glm')
-    
-    ####Measure model performance
-    n<-nrow(testset)
-    ##Get predictions
-    ##TODO: Fix this, need the separate cluster fields I think
-    pred<-predict(model$finalModel,subset(testset,select=-winner),type="response") 
-    predbin<-pred
-    predbin[predbin<0.5]<-0
-    predbin[predbin>=0.5]<-1
-    
-    ##Find percent correct out of all observations
-    predtable<-table(predbin,testset[,"winner"])
-    print(predtable)
-    perccorrect<-(predtable[1,1]+predtable[2,2])/n
-    print(paste("Percent correct as binary:",round(perccorrect,4)))
-    
-    
-    ##Find coefficients
-    coefs<-model$finalModel$coef
-    coefs<-coefs[grepl("cluster",names(coefs))]
-    coefs[is.na(coefs)]<-0
-    coefs<-coefs[order(-coefs)]
-    
-    clusterscores<-data.frame(cluster=gsub("cluster","",names(coefs)),buildscore=round(coefs,6))
     return(clusterscores)
 }
 
@@ -127,6 +95,7 @@ analyzechampions <- function(championName) {
         champtable<-champtablecreate()
         champtable<<-champtable
     }
+    
     if(championName=="ALL") {
         championIds<-as.character(unique(champtable$champ_id))        
     } else {
