@@ -226,8 +226,8 @@ analyzechampions <- function(championName) {
     return(allchamps)
 }
 ##Run the below to analyze all champions and load to SQL db. May take 15 hours with current parameters
-#allchampanalysis<-analyzechampions("ALL")
-colnames(allchampanalysis)[3]<-"ordernum"
-allchampanalysis<-cbind(allchampanalysis,analysisdate=as.Date(Sys.time()))
-con<-reconnectdb("statmous_analysis")
-dbWriteTable(con,"buildorder",allchampanalysis,append=T,row.names=F)
+# allchampanalysis<-analyzechampions("ALL")
+# colnames(allchampanalysis)[3]<-"ordernum"
+# allchampanalysis<-cbind(allchampanalysis,analysisdate=as.Date(Sys.time()))
+# con<-reconnectdb("statmous_analysis")
+# dbWriteTable(con,"buildorder",allchampanalysis,append=T,row.names=F)
