@@ -200,11 +200,7 @@ rankclusters<-function(champgames) {
 ##ALL CHAMPIONS takes about 15 hours currently
 analyzechampions <- function(championName) {    
     
-    if(!exists("champtable")) {
-        champtable<-champtablecreate()
-        champtable<<-champtable
-    }
-    
+    champtable<-champtablecreate()
     if(championName=="ALL") {
         championIds<-as.character(unique(champtable$champ_id))        
     } else {
@@ -231,7 +227,7 @@ analyzechampions <- function(championName) {
 }
 ##Run the below to analyze all champions and load to SQL db. May take 15 hours with current parameters
 #allchampanalysis<-analyzechampions("ALL")
-#colnames(allchampanalysis)[3]<-"ordernum"
-#allchampanalysis<-cbind(allchampanalysis,analysisdate=as.Date(Sys.time()))
-#con<-reconnectdb("statmous_analysis")
-#dbWriteTable(con,"buildorder",allchampanalysis,append=T,row.names=F)
+colnames(allchampanalysis)[3]<-"ordernum"
+allchampanalysis<-cbind(allchampanalysis,analysisdate=as.Date(Sys.time()))
+con<-reconnectdb("statmous_analysis")
+dbWriteTable(con,"buildorder",allchampanalysis,append=T,row.names=F)
