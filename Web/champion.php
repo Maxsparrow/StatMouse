@@ -18,7 +18,7 @@ include('model/champion.php');
 	if(isset($_GET['numPerPage'])){
 		$numPerPage = $_GET['numPerPage'];
 	} else {
-		$numPerPage = 13;
+		$numPerPage = 5;
 	}
 	
 	?>
@@ -26,50 +26,55 @@ include('model/champion.php');
 	<div class="container">
 		<?php 
 		$champion = new Champion($champion); 
-		echo "<h2><img style='width:90px;' src='".$champion->GetImagePath()."' /> ";
+		echo "<h1 style='color:#000;font-weight:bold;'><img style='width:90px;' src='".$champion->GetImagePath()."' /> ";
 		echo $champion->name;
-		echo "</h2>";
+		echo "</h1>";
+		?>
+		<table class="table-bordered">
+		<thead>
+		<th>Build Rank</th>
+		<th>Build Win Rate</th>
+		<th>Starting Items</th>
+		<?php 
+			for($i=1;$i<=9;$i+=1) {
+				echo "<th>Back ".$i."</th>";
+			}
+		?>
+		</thead>
 		
-		//For loop to repeat 3 times, output early, mid, and late game items
-		for ($i=1;$i<=3;$i+=1) {
-			if ($i==1) $phase = 'Early';
-			else if ($i==2) $phase = 'Mid';
-			else if ($i==3) $phase = 'Late';
-			?>
-		
-			<div class="col-md-4">
-			<table class="table-bordered"><caption style='font-size:24px;color:#000;font-weight:bold;'><?php echo $phase; ?> Game</caption>
-			<thead><tr><th>Item Name</th><th>Item Power</th></tr></thead>
-			<tbody>
-			
-			<?php		
-				$query = "SELECT * FROM itempower where championName = :champion AND analysisDate > '2014-12-11' AND gamePhase = :phase order by itemPower desc limit :numPerPage offset :offset";
-				$stmt = $db->prepare($query);
-				$stmt->bindValue(':champion', $champion->name, PDO::PARAM_STR);
-				$stmt->bindValue(':numPerPage', $numPerPage, PDO::PARAM_INT);
-				$stmt->bindValue(':offset', $page*$numPerPage, PDO::PARAM_INT);
-				$stmt->bindValue(':phase',$phase,PDO::PARAM_STR);
-				$stmt->execute();
-				$results = $stmt->fetchAll();
-				foreach($results as $row) {
-		    			echo "<tr><td><img style='height: 50%;' src='/img/item/".$row['itemId'].".png' /> ".$row['itemName']."</td>";
-		    			echo "<td style='text-align:center;'>".$row['itemPower']."</td></tr>";
-	    		}
-			?>
-			 
-			</tbody>
-			</table>
-			</div>	
-		<?php } ?>
+		<?php
+		for ($i=1;$i<=$numPerPage;$i+=1) {
+			echo "<tr>";
+			$query = "SELECT buildorder.*,champions.championName FROM buildorder LEFT JOIN champions ON buildorder.championId = champions.championId where championName = :champion AND analysisDate = '2015-02-08' AND buildrank = :build";
+			$stmt = $db->prepare($query);
+			$stmt->bindValue(':champion',$champion->name,PDO::PARAM_STR);
+			$stmt->bindValue(':build',$i,PDO::PARAM_INT);
+			$stmt->execute();
+			$results = $stmt->fetchAll();
+			echo "<td>".$results[1]['buildrank']."</td>";
+			echo "<td>".round($results[1]['buildscore']*100,2)."%</td>";
+			$lastordernum=0;
+			echo "<td>";
+			foreach($results as $row) {
+				if($row['ordernum']>9) {break;}
+				if($row['ordernum']>$lastordernum) {
+					echo "</td><td>";
+					$lastordernum=$row['ordernum'];
+				}
+				echo "<img style='height: 50%;' src='/img/item/".$row['itemId'].".png' />";			
+			}
+			echo "</tr>";
+		}?>
+		</table>
 
     	<?php
-		//Pagination CBJ 12.10.14
-			echo "<nav><ul class='pager'>";
-			
-				if ($page!=0) echo "<li class='previous'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=".($page-1)."' style='color: black;'> Previous Page </a></li>";			
-				if (count($results)>=$numPerPage) echo "<li class='next'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=".($page+1)."' style='color: black;'> Next Page </a></li>";
-				
-			echo "</ul></nav>";
+		//Pagination CBJ 12.10.14 (12.14.14 removed for now, only want to display a few per page)
+		//	echo "<nav><ul class='pager'>";
+		//	
+		//		if ($page!=0) echo "<li class='previous'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=".($page-1)."' style='color: black;'> Previous Page </a></li>";			
+		//		if (count($results)>=$numPerPage) echo "<li class='next'><a href='champion.php?champion=".htmlentities($champion->name, ENT_QUOTES)."&pg=".($page+1)."' style='color: black;'> Next Page </a></li>";
+		//		
+		//	echo "</ul></nav>";
     	?>	
 	</div>
 		
