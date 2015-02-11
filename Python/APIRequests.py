@@ -147,14 +147,15 @@ class matchhistory(apirequest):
             yield match
 	
 class match(apirequest):
-    def __init__(self,matchId):
+    def __init__(self,matchId,includeTimeline=True):
         """Initialize with base values from apirequest and matchId"""
         apirequest.__init__(self)
         self.matchId = matchId
         self.parsed = None
         self.inmongo = {}
+        self.includeTimeline = includeTimeline
         
-    def fetchdata(self,includeTimeline=True):
+    def fetchdata(self):
         ##Check if matchId already exists, if not, add to db and disconnect
         mcon = pymongo.MongoClient('localhost',27017)
         mdb = mcon.games
@@ -165,7 +166,7 @@ class match(apirequest):
             self.data = mdata
         else:
             self.inmongo['full'] = False
-            self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(self.matchId)+apirequest.apikey+'&includeTimeline='+str(includeTimeline)
+            self.url = apirequest.urlbase + apirequest.region+'/v2.2/match/'+str(self.matchId)+apirequest.apikey+'&includeTimeline='+str(self.includeTimeline)
             self.sendrequest()
             self.addcustomstats()
             
@@ -223,9 +224,12 @@ class match(apirequest):
 
     def addtomongo(self,collection,newonly=True):
         """Adds current matchdata to mongodb database or updates an existing match in mongodb. Use collection to specify full or parsed matches"""
+        if self.includeTimeline == True:
+            assert 'timeline' in self.data, "No timeline in match data"
+            
         if (newonly==True and self.inmongo[collection]==True):
             raise IOError('matchId already in '+collection+' collection')
-        
+            
         ##TODO: Add function or class for connecting to mongo
         results=[]                    
         mcon = pymongo.MongoClient('localhost',27017)
@@ -244,7 +248,8 @@ class match(apirequest):
         mcon.disconnect()
         return results 
           
-    def parsematch(self):        
+    def parsematch(self):   
+        assert 'timeline' in self.data, "No timeline in match data"     
         if self.data == None:
                 raise IOError('No api data. Use getdata method first.')
                 

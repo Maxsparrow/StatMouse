@@ -42,6 +42,9 @@ def getgamesmongo(matchIds):
             m.fetchparsed()
         except IOError as e:
             print str(e) + '. Cannot get parsed data, will add full data if possible'
+        except AssertionError as e: ##If there is no timeline data, skip this
+            print str(e) + '. Skipping to next'
+            continue
         
         ##Try to add to mongodb, will output error if it already is there
         try:
@@ -55,7 +58,8 @@ def getgamesmongo(matchIds):
         except IOError as e:
             print str(e) + ', Cannot add parsed data, moving on to next match'
         if fullcounter % 50 == 0:
-            print 'Added %d games to MongoDB full collection and %d records to MongoDB parsed collection so far this session' % (fullcounter, parsedcounter)
+            print 'Added %d games to MongoDB full collection and %d games to MongoDB parsed collection so far this session' % (fullcounter, parsedcounter)
+            
     print 'Operation completed successfully, added %d games to MongoDB full collection and %d games to MongoDB parsed collection' % (fullcounter, parsedcounter)
             
 ##Also consider making this function and the one above part of the above classes. or maybe subclasses
