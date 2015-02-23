@@ -315,10 +315,11 @@ class championinfo(apirequest):
     def __init__(self):
         apirequest.__init__(self)
         self.url = apirequest.urlbase + 'static-data/' + apirequest.region+'/v1.2/champion/'+apirequest.apikey
+        self.sendrequest()
         self.create_ids_table()
         
     def create_ids_table(self):
-        self.ids = {k:v['id'] for k,v in champtable.data['data'].items()}
+        self.ids = {k:v['id'] for k,v in self.data['data'].items()}
         
     def getId(self,championName):
         return self.ids[championName]
