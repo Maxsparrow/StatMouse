@@ -72,7 +72,10 @@ class ItemData(object):
         
     def filter_cluster(self,cluster):
         return self.data[self.data.cluster == cluster]
-    
+
+    def filter_first_item(self):
+        pass
+
     def create_order_table(self,itemId):
         pass
         
