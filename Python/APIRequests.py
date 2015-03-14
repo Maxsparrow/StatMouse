@@ -328,6 +328,26 @@ class championinfo(apirequest):
         assert type(championId) == int, "championId must be an integer: %r" %championId
         return [k for k, v in self.ids.items() if v == championId][0]
         
+class iteminfo(apirequest):
+    def __init__(self):
+        apirequest.__init__(self)
+        self.url = apirequest.urlbase + 'static-data/' + apirequest.region + '/v1.2/item/'+apirequest.apikey+'&itemListData=from,into'
+        self.sendrequest()
+        self.create_ids_table()
+        self.data = self.data['data']
+        for key in self.data:
+            self.data[key]['final'] = 'into' not in self.data[key] or self.data[key]['name'][:7]=="Enchant"
+        
+    def create_ids_table(self):
+        self.ids = {k:v['name'] for k,v in self.data['data'].items()}
+        
+    def getId(self,itemName):
+        return int([k for k, v in self.ids.items() if v == itemName][0])
+        
+    def getName(self,itemId):
+        assert type(itemId) == int, "itemId must be an integer: %r" %itemId
+        return self.ids[str(itemId)]
+        
 def getbadmatch():
     ##This is for fixing a team goldEarnedPercentage bug
     mcon = pymongo.MongoClient('localhost',27017)
