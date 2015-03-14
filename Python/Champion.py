@@ -1,11 +1,12 @@
 import sys
 import os
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
 sys.path.append(os.getcwd()+'/Python/')
 from Connections import *
 from APIRequests import *
 from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
 
 class Champion(object):
     def __init__(self,championName=None,championId=None):
@@ -41,7 +42,8 @@ class Champion(object):
         
     def set_clusters(self,clustercount):
         self.clustercount = clustercount
-        clustdata = self.itemdata.data.fillna(100)
+        clustdata = self.itemdata.filter_first_item()
+        clustdata = clustdata.fillna(100)
         kmeans = KMeans(init='k-means++',n_clusters=clustercount)
         kmeans.fit(clustdata)
         self.itemdata.set_cluster_labels(kmeans.labels_)
@@ -60,7 +62,28 @@ class Build(object):
         self.cluster = cluster
         
     def set_starting_items(self):
-        pass
+        """Add best starting items to this build"""
+        ##Start by looping through itemdata and finding all the starting items for each record
+        itemcombos = []
+        for row in self.itemdata.data.iterrows():
+            row = row[1]
+            row = row[row==0]
+            row = row[row.index!='cluster']
+            itemcombo = ";".join(list(row.index))
+            itemcombos.append(itemcombo)
+        itemcombos = Series(itemcombos,name='startingitems')
+        ##Add the item combinations to the gamedata dataframe
+        gamedata = self.gamedata.copy()
+        gamedata = pd.concat([gamedata,itemcombos])
+        gamedata.rename(columns={0:'startingitems'},inplace=True)
+        colstokeep = ['KDA','gameTowerKills','matchDuration','playerPercGold','teamBaronKills',
+        'teamDragonKills','teamId','teamPercGold','teamTowerKills','winner','startingitems']
+        return gamedata[colstokeep]
+        ##TODO There seems to be an issue when concating the item combos, many show as NaN
+        ##TODO implement and test this random forest
+        rf = RandomForestClassifier()
+        rf.fit(gamedata[gamedata.columns[gamedata.columns!='winner']],gamedata['winner'])
+        rf.feature_importances_
         
     def set_final_items(self):
         pass
@@ -79,7 +102,7 @@ class ItemData(object):
     def filter_first_item(self):
         cols = self.data.columns
         cols = [col for col in cols if col[-2::]=='_1']
-        self.data = self.data[cols]        
+        return self.data[cols]        
         
     def filter_cluster(self,cluster):
         return ItemData(self.data[self.data.cluster == cluster])
@@ -91,12 +114,10 @@ class ItemData(object):
         pass
         
 ####Test on Ezreal
+champs = championinfo()
+items = iteminfo()
+    
 ez = Champion('Ezreal')
 ez.make_split_data()
-ez.itemdata.filter_first_item()
 ez.set_clusters(3)
 ez.set_builds()
-
-items = iteminfo()
-items
-    

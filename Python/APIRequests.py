@@ -330,7 +330,7 @@ class championinfo(apirequest):
         
 class iteminfo(apirequest):
     def __init__(self):
-        apirequest.__init__(self)
+        apirequest.__init__(self)   
         self.url = apirequest.urlbase + 'static-data/' + apirequest.region + '/v1.2/item/'+apirequest.apikey+'&itemListData=from,into'
         self.sendrequest()
         self.create_ids_table()
