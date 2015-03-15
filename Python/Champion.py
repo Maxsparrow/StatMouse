@@ -59,6 +59,7 @@ class Build(object):
     def __init__(self,champion,cluster):
         self.itemdata = champion.itemdata.filter_cluster(cluster)
         self.gamedata = champion.gamedata[champion.gamedata.cluster == cluster]
+        self.gamedata.index = range(len(self.gamedata))
         self.cluster = cluster
         
     def set_starting_items(self):
@@ -74,7 +75,7 @@ class Build(object):
         itemcombos = Series(itemcombos,name='startingitems')
         ##Add the item combinations to the gamedata dataframe
         gamedata = self.gamedata.copy()
-        gamedata = pd.concat([gamedata,itemcombos])
+        gamedata = pd.concat([gamedata,itemcombos],axis=1)
         gamedata.rename(columns={0:'startingitems'},inplace=True)
         colstokeep = ['KDA','gameTowerKills','matchDuration','playerPercGold','teamBaronKills',
         'teamDragonKills','teamId','teamPercGold','teamTowerKills','winner','startingitems']
@@ -105,7 +106,9 @@ class ItemData(object):
         return self.data[cols]        
         
     def filter_cluster(self,cluster):
-        return ItemData(self.data[self.data.cluster == cluster])
+        newdata = self.data[self.data.cluster==cluster]
+        newdata.index = range(len(newdata))
+        return ItemData(newdata)
 
     def create_order_table(self,itemId):
         pass
