@@ -10,6 +10,7 @@ import sys
 import os
 sys.path.append(os.getcwd()+'/Python/')
 from Connections import *
+from logger import logger
 
 class summoners(object):
     def __init__(self):
@@ -92,27 +93,27 @@ class apirequest(object):
                     raise IOError('Unknown error. Cannot retrieve apidata after 3 attempts')
                 else:  
                     self.errorcounter += 1                  
-                    print 'Could not retrieve apidata, retrying (attempt #%d)' % self.errorcounter
+                    logger.warning('Could not retrieve apidata, retrying (attempt #%d)', self.errorcounter)
                     time.sleep(5)
         ##Check the status of the data returned for error codes:
         if 'status' in self.data and self.data['status']['status_code']!=200:
             self.statuscheck()
         elif self.errorcounter > 0:
-            print 'Retry succeeded'
+            logger.info('Retry succeeded')
             self.errorcounter = 0
             
     def ratelimitcheck(self):
         ##Only allow 8 requests every 10 seconds to stay within the rate limit
         if len(apirequest.requesthistory)>8:
             if (datetime.datetime.now()-apirequest.requesthistory[-8]).seconds<10:
-                print 'Pausing 10 seconds for rate limit'
+                logger.info('Pausing 10 seconds for rate limit')
                 time.sleep(10)
         apirequest.requesthistory.append(datetime.datetime.now())
                     
     def statuscheck(self):
         statuscode = self.data['status']['status_code']
         if statuscode == 429:
-            print 'Error 429 Rate limit exceeded, pausing 10 seconds and trying again'
+            logger.warning('Error 429 Rate limit exceeded, pausing 10 seconds and trying again')
             self.errorcounter += 1
             time.sleep(10)
             if self.errorcounter <= 5:
@@ -121,7 +122,7 @@ class apirequest(object):
                 self.errorcounter = 0
                 raise IOError('Hit error 5 times, cannot pull api data')                
         elif statuscode == 503 or statuscode == 500:
-            print 'Error '+str(statuscode)+' API service unavailable, waiting 5 minutes and trying again'
+            logger.warning('Error %s API service unavailable, waiting 5 minutes and trying again', str(statuscode))
             self.errorcounter += 1
             time.sleep(300)
             if self.errorcounter <= 5:
@@ -357,7 +358,7 @@ def getbadmatch():
     curmatch = gamescoll.find_one({'teams.0.goldEarnedPercentage':{'$exists':0}})
     mcon.disconnect()
     
-    print curmatch['matchId']
+    logger.info('Current match %s', curmatch['matchId'])
     match1 = match(curmatch['matchId'])
     match1.fetchdata()
     match1.addcustomstats()
